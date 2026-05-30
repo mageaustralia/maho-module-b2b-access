@@ -1,0 +1,146 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Maho
+ *
+ * @package    MageAustralia_B2bAccess
+ * @copyright  Copyright (c) 2026 Mage Australia
+ * @license    https://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ */
+-->
+<config>
+    <sections>
+        <b2baccess translate="label" module="b2baccess">
+            <label>B2B Access</label>
+            <tab>customer</tab>
+            <sort_order>400</sort_order>
+            <show_in_default>1</show_in_default>
+            <show_in_website>1</show_in_website>
+            <show_in_store>1</show_in_store>
+            <groups>
+                <general translate="label">
+                    <label>General</label>
+                    <sort_order>10</sort_order>
+                    <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                    <fields>
+                        <enabled translate="label comment">
+                            <label>Enabled</label>
+                            <comment>Master switch for the access gate. Off = no gating at all.</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>10</sort_order>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </enabled>
+                    </fields>
+                </general>
+                <login translate="label">
+                    <label>Login Wall</label>
+                    <comment>Require login to view the storefront. CMS pages and the auth pages stay public so guests can still log in / register.</comment>
+                    <sort_order>20</sort_order>
+                    <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                    <fields>
+                        <required translate="label comment">
+                            <label>Require login to view store</label>
+                            <comment>Redirect guests away from catalog/checkout to the page below.</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>10</sort_order>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </required>
+                        <redirect_cms translate="label comment">
+                            <label>Redirect guests to</label>
+                            <comment>CMS page shown to walled-out guests. Leave blank to send them to the login page.</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>b2baccess/system_cmsPage</source_model>
+                            <sort_order>20</sort_order>
+                            <depends><required>1</required></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </redirect_cms>
+                        <message translate="label comment">
+                            <label>Notice shown to guests</label>
+                            <comment>Optional message added on redirect (e.g. "Please log in to continue").</comment>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>30</sort_order>
+                            <depends><required>1</required></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </message>
+                    </fields>
+                </login>
+                <price translate="label">
+                    <label>Hide Prices</label>
+                    <comment>Replace prices with a message and block purchasing for the customers/categories selected in the matrix below.</comment>
+                    <sort_order>30</sort_order>
+                    <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                    <fields>
+                        <hide translate="label comment">
+                            <label>Hide prices</label>
+                            <comment>When the matrix matches, prices are replaced with the message below.</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>10</sort_order>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </hide>
+                        <message translate="label comment">
+                            <label>Hidden-price message</label>
+                            <comment>Shown in place of the price (e.g. "Log in to see pricing").</comment>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>20</sort_order>
+                            <depends><hide>1</hide></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </message>
+                        <block_purchase translate="label comment">
+                            <label>Block purchasing too</label>
+                            <comment>Reject add-to-cart server-side for gated products (recommended; hiding the price alone is bypassable).</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>30</sort_order>
+                            <depends><hide>1</hide></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </block_purchase>
+                    </fields>
+                </price>
+                <matrix translate="label">
+                    <label>Activation Matrix</label>
+                    <comment>Who/what the price + purchase gate applies to. By customer group OR by category (either is enough). Independent of the login wall.</comment>
+                    <sort_order>40</sort_order>
+                    <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                    <fields>
+                        <by_customer translate="label comment">
+                            <label>Gate by customer group</label>
+                            <comment>Hide prices from the selected groups (include "NOT LOGGED IN" to hide from guests).</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>10</sort_order>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </by_customer>
+                        <customer_groups translate="label">
+                            <label>Customer groups</label>
+                            <frontend_type>multiselect</frontend_type>
+                            <source_model>b2baccess/system_customerGroups</source_model>
+                            <sort_order>20</sort_order>
+                            <can_be_empty>1</can_be_empty>
+                            <depends><by_customer>1</by_customer></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </customer_groups>
+                        <by_category translate="label comment">
+                            <label>Gate by category</label>
+                            <comment>Hide prices for products in the categories below (subcategories included).</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>30</sort_order>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </by_category>
+                        <categories translate="label comment">
+                            <label>Category IDs</label>
+                            <comment>Comma-separated category IDs. Subcategories inherit; a product in any gated category is gated everywhere.</comment>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>40</sort_order>
+                            <depends><by_category>1</by_category></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </categories>
+                    </fields>
+                </matrix>
+            </groups>
+        </b2baccess>
+    </sections>
+</config>

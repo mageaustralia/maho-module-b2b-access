@@ -1,0 +1,36 @@
+{
+    "name": "mageaustralia/maho-module-b2b-access",
+    "description": "B2B access gate for Maho 26.5+: require login to view the store, hide prices and block purchasing for guests or selected customer groups / categories. Server-side enforced, observer-driven, no core rewrites.",
+    "type": "maho-module",
+    "license": "OSL-3.0",
+    "authors": [
+        {
+            "name": "MageAustralia",
+            "email": "dev@mageaustralia.com.au"
+        }
+    ],
+    "keywords": [
+        "maho",
+        "openmage",
+        "magento",
+        "b2b",
+        "wholesale",
+        "hide-price",
+        "require-login"
+    ],
+    "homepage": "https://github.com/mageaustralia/maho-module-b2b-access",
+    "require": {
+        "php": "^8.3",
+        "mahocommerce/maho": "^26.5"
+    },
+    "autoload": {
+        "psr-0": {
+            "MageAustralia_B2bAccess": "app/code/community"
+        }
+    },
+    "extra": {
+        "maho-module": {
+            "module-xml": "app/etc/modules/MageAustralia_B2bAccess.xml"
+        }
+    }
+}
