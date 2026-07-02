@@ -75,11 +75,10 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
             }
         }
 
-        $data = Mage::getSingleton('adminhtml/session')->getFormData(true);
-        if (!empty($data)) {
-            $model->addData($data);
-        }
-
+        // Do not merge session form data into the model here: after a validation
+        // error the posted values are in raw-post shape (multiselects as arrays,
+        // categories as CSV), which the model's JSON accessors would misread. The
+        // edit form peeks the session itself and prefers it verbatim.
         Mage::register('b2baccess_rule', $model);
 
         $this->_initAction()

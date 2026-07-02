@@ -24,12 +24,11 @@
         </block>
     </adminhtml_b2baccess_rule_grid>
 
-    <!-- Rule edit form -->
+    <!-- Rule edit form. The container auto-creates its
+         b2baccess/adminhtml_rule_edit_form child (mode = edit). -->
     <adminhtml_b2baccess_rule_edit>
         <reference name="content">
-            <block type="b2baccess/adminhtml_rule_edit" name="b2baccess.rule.edit">
-                <block type="b2baccess/adminhtml_rule_edit_form" name="form"/>
-            </block>
+            <block type="b2baccess/adminhtml_rule_edit" name="b2baccess.rule.edit"/>
         </reference>
     </adminhtml_b2baccess_rule_edit>
 

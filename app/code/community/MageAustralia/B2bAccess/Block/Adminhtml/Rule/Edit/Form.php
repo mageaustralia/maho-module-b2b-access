@@ -124,9 +124,13 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
     private function getFormValues(MageAustralia_B2bAccess_Model_Rule $rule): array
     {
         // Session form data (after a validation error) wins so the admin's edits
-        // are not lost.
+        // are not lost. It is in raw-post shape (multiselects as arrays,
+        // categories as CSV, products as the typed text), which is exactly what
+        // the form fields expect. Peek then clear so it does not leak to the next
+        // edit.
         $session = Mage::getSingleton('adminhtml/session')->getFormData();
         if (is_array($session) && $session !== []) {
+            Mage::getSingleton('adminhtml/session')->setFormData(false);
             return $session;
         }
 
