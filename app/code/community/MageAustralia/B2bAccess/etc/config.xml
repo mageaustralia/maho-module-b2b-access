@@ -21,6 +21,11 @@
                 <class>MageAustralia_B2bAccess_Helper</class>
             </b2baccess>
         </helpers>
+        <blocks>
+            <b2baccess>
+                <class>MageAustralia_B2bAccess_Block</class>
+            </b2baccess>
+        </blocks>
         <models>
             <b2baccess>
                 <class>MageAustralia_B2bAccess_Model</class>
@@ -60,7 +65,24 @@
         </translate>
     </frontend>
 
+    <admin>
+        <routers>
+            <adminhtml>
+                <args>
+                    <modules>
+                        <mageaustralia_b2baccess before="Mage_Adminhtml">MageAustralia_B2bAccess_Adminhtml</mageaustralia_b2baccess>
+                    </modules>
+                </args>
+            </adminhtml>
+        </routers>
+    </admin>
+
     <adminhtml>
+        <layout>
+            <updates>
+                <mageaustralia_b2baccess><file>mageaustralia_b2baccess.xml</file></mageaustralia_b2baccess>
+            </updates>
+        </layout>
         <translate>
             <modules>
                 <MageAustralia_B2bAccess>

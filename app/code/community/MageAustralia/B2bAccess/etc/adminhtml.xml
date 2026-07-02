@@ -9,10 +9,29 @@
  */
 -->
 <config>
+    <menu>
+        <customer>
+            <children>
+                <b2baccess_rules translate="title" module="b2baccess">
+                    <title>B2B Access Rules</title>
+                    <sort_order>90</sort_order>
+                    <action>adminhtml/b2baccess_rule</action>
+                </b2baccess_rules>
+            </children>
+        </customer>
+    </menu>
     <acl>
         <resources>
             <admin>
                 <children>
+                    <customer>
+                        <children>
+                            <b2baccess_rules translate="title" module="b2baccess">
+                                <title>B2B Access Rules</title>
+                                <sort_order>90</sort_order>
+                            </b2baccess_rules>
+                        </children>
+                    </customer>
                     <system>
                         <children>
                             <config>
