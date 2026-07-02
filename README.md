@@ -1,128 +1,270 @@
 # MageAustralia_B2bAccess
 
-B2B access gate for Maho 26.5+. Require login to view the store, hide prices,
-hide products entirely, and block purchasing for selected customer groups,
-categories, countries or products. Server-side enforced, observer-driven, no
-core rewrites.
+A B2B access-control gate for Maho 26.5+. Require login to view the store, hide
+prices, hide products entirely, and block purchasing, scoped by customer group,
+category, destination country or individual product. Everything is enforced on
+the server (observers and a checkout guard), reflected in Meilisearch search
+results, and configurable as either a single simple gate or a full rules engine.
+No core rewrites.
 
-## What it does
+- **Maho / OpenMage** module (community codepool), PHP 8.3+.
+- Modernised conventions: `declare(strict_types=1)`, PHP attribute observers and
+  routes, OSL-3.0, no Zend, no Prototype.
+- Soft integrations only: works standalone; gets richer when
+  `maho-module-meilisearch` and `maho-module-geoip` are present.
 
-Three independent capabilities:
+---
 
-1. **Login wall** - redirect guests to a CMS page (or the login page) on every
-   storefront action except the pages they need to log in / register.
-2. **Restrictions** - for a matched customer/product, hide the price, hide the
-   product from listings and search, and/or block purchasing.
-3. **Country restrictions** - block ordering of a product to specific
-   destination countries (brand distribution contracts), enforced at checkout
-   against the shipping address.
+## Feature scope at a glance
 
-Everything is enforced on the server: hiding a price also blocks the crafted
-add-to-cart URL; hiding a listing also removes the product from the Meilisearch
-index for the restricted groups; a country block aborts order submission.
+| Capability | What it does | Scope options | Server-enforced |
+|---|---|---|---|
+| **Login wall** | Redirect guests to a CMS/login page until they sign in | store view | yes |
+| **Hide price** | Replace the price with a message | group, category, country, product | yes |
+| **Hide product** | Remove from category listings and search entirely | group, category, country, product | yes (incl. search index) |
+| **Block purchase** | Reject add-to-cart and abort order submission | group, category, country, product | yes (add-to-cart + checkout) |
+| **Country restriction** | Block ordering to specific destinations | country (+ any other scope) | yes (checkout guard) |
+| **Redirect gated PDP** | Send a direct hit on a hidden product to a CMS page | per rule | yes |
 
-## Two modes
+Two ways to configure the above:
+
+- **Basic mode** (default): one gate, driven entirely by System Configuration.
+  Enough for "log in to see prices" wholesale shops.
+- **Rules mode**: many named rules, each with independent scope, actions,
+  enforcement level and priority. For multi-market, multi-brand or
+  professional-only catalogues.
+
+---
+
+## Why you would use it
+
+- **Wholesale / trade store** - require login to see any pricing; show retail
+  customers a "call for trade pricing" message; block them from buying.
+- **Professional-only products** - a range of products (veterinary, chemical,
+  licensed) visible and buyable only to an approved "Professional" customer
+  group, hidden from everyone else including in search.
+- **Brand distribution contracts** - a brand you may not sell into certain
+  countries: the products stay browsable but cannot be ordered to a blocked
+  shipping destination, enforced at checkout.
+- **Region / store gating** - different visibility per store view or website in
+  a multi-store setup.
+
+---
+
+## Concepts
+
+### The gate
+
+A single engine (`b2baccess/gate`) answers every enforcement question. It reads
+a set of **rules** from one of two sources and applies them uniformly, so the
+storefront behaviour, the search index and the checkout guard always agree.
+
+### A rule
+
+A rule has:
+
+- **Scope** (all AND-ed; an empty list means "any" for that dimension):
+  - customer groups (empty = any group, including guests)
+  - stores (empty or "All Store Views" = any store)
+  - destination countries (matched against the shipping country at checkout)
+  - categories (subcategories are included automatically)
+  - products (by SKU or ID)
+- **Actions**: hide from listings/search, hide price, block purchase, and an
+  optional CMS redirect for direct hits on a hidden product page.
+- **Enforcement**: where the rule bites.
+  - `visibility` - hide only; browsing-time actions (price/listing), still
+    allow checkout.
+  - `checkout` - do not change what is shown, but block ordering.
+  - `both` - apply both.
+- **Priority** (lower first) and an optional per-rule message override.
+
+A rule with no category and no product scope is **catalog-wide** (covers every
+product), which is how "hide all prices from group X" is expressed.
+
+Because a guest's country is unknown while browsing, country rules default to
+`checkout` (or `both`): the authoritative block happens at order submission,
+where the shipping address is finally known.
+
+---
+
+## Modes
 
 Set **System > Configuration > Customers > B2B Access > General > Mode**.
 
-### Basic (default)
+### Basic mode (default)
 
-One gate, configured entirely in the config section:
+Everything is configured in the config section:
 
-- **Login Wall** - require login, redirect target, notice.
-- **Restrictions** - hide prices, hide products entirely, block purchasing,
-  hidden-price message.
+- **Login Wall** - require login, redirect target (a CMS page or the login
+  page), and an optional notice.
+- **Restrictions** - hide prices, hide products entirely, block purchasing, and
+  the hidden-price message.
 - **Activation Matrix** - who/what the restrictions apply to: by customer group
   (OR) by category (subcategories included).
 
-This reproduces the original single-gate behaviour and is enough for most
-"log in to see prices" wholesale shops.
+Basic mode reproduces the module's original single-gate behaviour exactly. Note
+that "Gate by category" applies to all customer groups; for per-group hiding,
+use Rules mode.
 
-### Rules
+### Rules mode
 
-Multiple named rules under **Customers > B2B Access Rules**, each with its own:
+A grid under **Customers > B2B Access Rules** (Add New Rule) with a three-part
+form:
 
-- **Scope** (all AND-ed; empty = any): customer groups, stores, destination
-  countries, categories, products (SKUs or IDs).
-- **Actions**: hide from listings and search, hide price, block purchase,
-  redirect a gated product page to a CMS page.
-- **Enforcement**: `visibility` (hide only), `checkout` (block ordering only),
-  or `both`.
-- **Priority** and an optional per-rule message.
+- **General** - name, active, priority, enforcement, message override.
+- **Scope** - groups, stores, countries, categories, products (SKUs or IDs).
+- **Actions** - hide listing, hide price, block purchase, redirect.
 
-Rules are evaluated by priority (lowest first). A rule with no category and no
-product scope is catalog-wide.
+Rules evaluate by priority. Switching between modes never loses your Basic
+configuration; the grid governs Rules mode only.
+
+---
 
 ## Meilisearch integration
 
 When [maho-module-meilisearch](https://github.com/mageaustralia/maho-module-meilisearch)
-is installed, this module subscribes to its `meilisearch_product_restrictions`
-event and contributes, per product, the customer-group IDs the product is hidden
+is installed, this module keeps search results consistent with the gate. It
+subscribes to that module's `meilisearch_product_restrictions` event and
+contributes, per product per store, the customer-group IDs the product is hidden
 from (from every `visibility`/`both` hide-listing rule that covers it). The
-search index carries a `restricted_customer_group_ids` field and the storefront
-filters with `restricted_customer_group_ids != <currentGroupId>`, so restricted
-products never appear in search for the wrong group.
+index carries a `restricted_customer_group_ids` field and the storefront filters
+each query with `restricted_customer_group_ids != <currentGroupId>`, so a
+restricted product never appears in autocomplete or search for the wrong group.
 
-Run a full Meilisearch reindex after changing hide-listing rules.
+- Run a full Meilisearch reindex after adding or changing hide-listing rules.
+- Zero coupling: with the search module absent the event never fires and nothing
+  breaks; with it present it works with no extra configuration.
+- Country scope is intentionally **not** pushed into the (geo-agnostic,
+  CDN-cacheable) index; country is enforced server-side at checkout.
 
-No coupling: if the search module is absent the event never fires and nothing
-breaks; if present it works with zero extra configuration.
-
-## Country restrictions
-
-Country scope is matched at checkout against the quote's shipping country
-(billing for virtual carts). Because a guest's country is usually unknown while
-browsing, country rules default to `checkout` (or `both`) enforcement: the
-authoritative block happens in `sales_model_service_quote_submit_before`, before
-any order is created, and names the offending item(s). Country is intentionally
-not pushed into the (geo-agnostic, CDN-cacheable) search index.
+---
 
 ## Migrating from Amasty Customer Group Catalog (Magento 1)
 
-A CLI importer maps `am_groupcat_rules` / `am_groupcat_product` into rules:
+A CLI importer maps `am_groupcat_rules` / `am_groupcat_product` into access
+rules:
 
 ```bash
-./maho b2baccess:import-groupcat --dry-run   # preview
+./maho b2baccess:import-groupcat --dry-run   # preview what would be imported
 ./maho b2baccess:import-groupcat             # import
 ```
 
-It is idempotent (imported rules are named `Groupcat: <name>` and skipped on
-re-run). After importing, set Mode = Rules and reindex Meilisearch.
+Mapping: customer groups, stores, categories and product links carry across;
+`remove_product_links` becomes hide-listing, `hide_price` becomes hide-price,
+purchasing is blocked, and enforcement is set to `both`. It is idempotent
+(imported rules are named `Groupcat: <name>` and skipped on re-run). Afterward,
+set Mode = Rules and reindex Meilisearch.
+
+---
 
 ## Install
 
 ```bash
 composer require mageaustralia/maho-module-b2b-access
 ./maho cache:flush
-composer dump-autoload   # compile the observer/route attributes
+composer dump-autoload   # compile the observer + route attributes
 ```
 
 Rules mode adds two tables (`b2baccess_rule`, `b2baccess_rule_product`); the
-setup script runs automatically on first load, including for installs upgrading
+setup script runs automatically on first load, including on installs upgrading
 from 1.0.0.
 
+---
+
 ## Enforcement points
+
+Every behaviour is server-side; hiding UI alone is never relied upon.
 
 | Concern | Hook |
 |---|---|
 | Login wall | `controller_action_predispatch` (redirect guests) |
 | Hide price | `core_block_abstract_to_html_after` (rewrite price block) |
-| Drop price sort | `core_block_abstract_to_html_before` (toolbar) |
-| Hide listing | `catalog_block_product_list_collection` (filter collection) |
-| Block add-to-cart | `controller_action_predispatch_checkout_cart_add[group]` |
-| Country checkout guard | `sales_model_service_quote_submit_before` |
+| Drop price sort option | `core_block_abstract_to_html_before` (listing toolbar) |
+| Hide from listings | `catalog_block_product_list_collection` (filter collection) |
+| Block add-to-cart | `controller_action_predispatch_checkout_cart_add` / `_addgroup` |
+| Country / purchase guard | `sales_model_service_quote_submit_before` (abort submit) |
 | Search restrictions | `meilisearch_product_restrictions` (contribute group IDs) |
+
+The add-to-cart guard also throws server-side, so a crafted
+`?product=...&qty=` URL cannot bypass a hidden button. The checkout guard fires
+before every order path (onepage, multishipping, admin, PayPal, ...) and names
+the offending item(s), including child simples of configurable/bundle products.
+
+---
+
+## Configuration reference
+
+| Path | Meaning |
+|---|---|
+| `b2baccess/general/enabled` | Master switch |
+| `b2baccess/general/mode` | `basic` or `rules` |
+| `b2baccess/login/required` | Require login to view the store |
+| `b2baccess/login/redirect_cms` | CMS page for walled-out guests (blank = login page) |
+| `b2baccess/login/message` | Notice shown on redirect |
+| `b2baccess/price/hide` | Hide prices when the matrix matches |
+| `b2baccess/price/hide_listing` | Also remove matched products from listings/search |
+| `b2baccess/price/message` | Hidden-price message |
+| `b2baccess/price/block_purchase` | Block purchasing of matched products |
+| `b2baccess/matrix/by_customer` + `customer_groups` | Gate by customer group |
+| `b2baccess/matrix/by_category` + `categories` | Gate by category (subcategories included) |
+
+All paths are store-scoped.
+
+---
+
+## For developers
+
+### Contributing search restrictions from another module
+
+Any module can hide products from groups in search by subscribing to the same
+event this module uses. Push integer group IDs onto the transport's
+`restricted_customer_group_ids` array:
+
+```php
+#[\Maho\Config\Observer('meilisearch_product_restrictions')]
+public function addRestrictions(\Maho\Event\Observer $observer): void
+{
+    $transport = $observer->getEvent()->getTransport();
+    $existing  = (array) $transport->getData('restricted_customer_group_ids');
+    $transport->setData(
+        'restricted_customer_group_ids',
+        array_values(array_unique(array_merge($existing, [1, 4]))),
+    );
+}
+```
+
+### Asking the gate directly
+
+```php
+/** @var MageAustralia_B2bAccess_Helper_Data $h */
+$h = Mage::helper('b2baccess');
+$h->shouldHidePrice($product);
+$h->shouldHideListing($product);
+$h->shouldBlockPurchase($product);
+$h->getRestrictedGroupIdsForProduct($product, $storeId); // list<int>
+```
+
+---
 
 ## Tests
 
 ```bash
-# Pure logic, no Maho needed:
+# Pure logic, no Maho needed (rule scope matching, enforcement flags):
 vendor/bin/phpunit --testsuite Unit
 
-# Full suite against a Maho install:
+# Full suite against a Maho install (rule persistence, basic-mode gate,
+# Amasty import); skips gracefully without MAHO_ROOT:
 MAHO_ROOT=/path/to/maho vendor/bin/phpunit
 ```
 
+---
+
+## Compatibility
+
+- Maho 26.5+ / PHP 8.3+.
+- Optional: `maho-module-meilisearch` (search-aware hiding),
+  `maho-module-geoip` (country hints for the visibility layer).
+
 ## License
 
-OSL-3.0.
+Open Software License 3.0 (OSL-3.0).
