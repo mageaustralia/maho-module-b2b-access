@@ -224,6 +224,26 @@ class MageAustralia_B2bAccess_Model_Gate
         return $this->_hiddenProductIds[$key] = array_values($ids);
     }
 
+    /**
+     * True when a checkout-enforcing block-purchase rule covers this product for
+     * the given context. This is where country-scoped rules finally bite: at
+     * add-to-cart the shipping country is usually unknown, but at checkout the
+     * quote carries a real shipping address.
+     */
+    public function isPurchaseBlockedAtCheckout(
+        Mage_Catalog_Model_Product $product,
+        int $storeId,
+        int $groupId,
+        ?string $countryCode,
+    ): bool {
+        foreach ($this->matchingRules($product, $storeId, $groupId, $countryCode) as $rule) {
+            if ($rule->blockPurchase && $rule->enforcesCheckout()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function ruleHasAction(MageAustralia_B2bAccess_Model_Gate_Rule $rule, string $action): bool
     {
         return match ($action) {

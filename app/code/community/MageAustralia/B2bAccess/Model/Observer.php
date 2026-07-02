@@ -206,4 +206,28 @@ class MageAustralia_B2bAccess_Model_Observer
         $action->getResponse()->setRedirect($referer !== '' ? $referer : Mage::getUrl(''));
         $action->setFlag('', Mage_Core_Controller_Varien_Action::FLAG_NO_DISPATCH, true);
     }
+
+    /**
+     * Checkout guard: the authoritative backstop for country-scoped rules. Fires
+     * before any order is created (onepage, multishipping, admin, PayPal, ...),
+     * so a destination-restricted product cannot be ordered even if it slipped
+     * into the cart before a country was known. Aborts submission with a message
+     * naming the offending item(s).
+     */
+    #[MahoObserver('sales_model_service_quote_submit_before', type: 'singleton')]
+    public function guardCheckout(Observer $observer): void
+    {
+        $quote = $observer->getEvent()->getQuote();
+        if (!$quote instanceof Mage_Sales_Model_Quote) {
+            return;
+        }
+        $blocked = $this->helper()->getBlockedQuoteItemNames($quote);
+        if ($blocked === []) {
+            return;
+        }
+        Mage::throwException(
+            (string) $this->helper()->__('This product is not available in your country.')
+            . ' ' . implode(', ', $blocked),
+        );
+    }
 }

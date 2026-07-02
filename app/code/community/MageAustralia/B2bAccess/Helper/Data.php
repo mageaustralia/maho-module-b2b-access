@@ -221,6 +221,57 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
         return trim((string) Mage::getStoreConfig(self::XML_PRICE_MESSAGE));
     }
 
+    /* ---------------- checkout guard ---------------- */
+
+    /**
+     * The destination country for a quote: the shipping address for physical
+     * carts, falling back to the billing address for virtual/downloadable ones.
+     * Null when neither carries a country yet.
+     */
+    public function getQuoteCountryCode(Mage_Sales_Model_Quote $quote): ?string
+    {
+        $address = $quote->isVirtual() ? $quote->getBillingAddress() : $quote->getShippingAddress();
+        $country = $address ? (string) $address->getCountryId() : '';
+        if ($country === '') {
+            $country = (string) $quote->getBillingAddress()?->getCountryId();
+        }
+        return $country !== '' ? strtoupper($country) : null;
+    }
+
+    /**
+     * Names of cart items that may not be purchased to the quote's destination
+     * for its customer group. Empty when the order is allowed. Used by the
+     * checkout guard to abort submission with a clear, specific message.
+     *
+     * @return list<string>
+     */
+    public function getBlockedQuoteItemNames(Mage_Sales_Model_Quote $quote): array
+    {
+        if (!$this->isEnabled((int) $quote->getStoreId())) {
+            return [];
+        }
+        $storeId = (int) $quote->getStoreId();
+        $groupId = (int) $quote->getCustomerGroupId();
+        $country = $this->getQuoteCountryCode($quote);
+        $gate = $this->gate();
+
+        $blocked = [];
+        foreach ($quote->getAllItems() as $item) {
+            /** @var Mage_Sales_Model_Quote_Item $item */
+            if ($item->getParentItemId()) {
+                continue; // child of a configurable/bundle; the parent carries the gate
+            }
+            $product = $item->getProduct();
+            if (!$product instanceof Mage_Catalog_Model_Product) {
+                continue;
+            }
+            if ($gate->isPurchaseBlockedAtCheckout($product, $storeId, $groupId, $country)) {
+                $blocked[$item->getName()] = (string) $item->getName();
+            }
+        }
+        return array_values($blocked);
+    }
+
     /* ---------------- config accessors (used by the gate) ---------------- */
 
     /**
