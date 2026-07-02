@@ -318,10 +318,11 @@ class MageAustralia_B2bAccess_Model_Gate
 
         /** @var MageAustralia_B2bAccess_Model_Resource_Rule_Collection $collection */
         $collection = Mage::getResourceModel('b2baccess/rule_collection');
-        $collection->addActiveFilter()
-            ->addStoreFilter($storeId)
-            ->setOrder('priority', 'ASC');
+        $collection->addActiveFilter()->setPriorityOrder();
 
+        // All active rules are built into value objects; per-store scope is then
+        // applied by Rule::matchesStore at match time. Rule counts are small
+        // (tens), so this is cheaper and less error-prone than a JSON LIKE query.
         $rules = [];
         foreach ($collection as $model) {
             /** @var MageAustralia_B2bAccess_Model_Rule $model */

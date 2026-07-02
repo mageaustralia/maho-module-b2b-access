@@ -11,7 +11,7 @@
 <config>
     <modules>
         <MageAustralia_B2bAccess>
-            <version>1.0.0</version>
+            <version>1.1.0</version>
         </MageAustralia_B2bAccess>
     </modules>
 
@@ -24,8 +24,23 @@
         <models>
             <b2baccess>
                 <class>MageAustralia_B2bAccess_Model</class>
+                <resourceModel>b2baccess_resource</resourceModel>
             </b2baccess>
+            <b2baccess_resource>
+                <class>MageAustralia_B2bAccess_Model_Resource</class>
+                <entities>
+                    <rule><table>b2baccess_rule</table></rule>
+                    <rule_product><table>b2baccess_rule_product</table></rule_product>
+                </entities>
+            </b2baccess_resource>
         </models>
+        <resources>
+            <b2baccess_setup>
+                <setup>
+                    <module>MageAustralia_B2bAccess</module>
+                </setup>
+            </b2baccess_setup>
+        </resources>
         <!--
              Observers are registered via #[Maho\Config\Observer] PHP attributes
              on Model/Observer.php (compiled at composer dump-autoload into
