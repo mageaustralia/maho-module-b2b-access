@@ -16,7 +16,7 @@ declare(strict_types=1);
  */
 class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Adminhtml_Controller_Action
 {
-    public const ADMIN_RESOURCE = 'b2baccess/rules';
+    public const ADMIN_RESOURCE = 'customer/b2baccess_rules';
 
     #[\Override]
     public function preDispatch()
@@ -28,7 +28,9 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
     #[\Override]
     protected function _isAllowed(): bool
     {
-        return Mage::getSingleton('admin/session')->isAllowed('admin/b2baccess/rules');
+        // Must match the ACL node in adminhtml.xml (admin/customer/b2baccess_rules)
+        // so a role granted this permission is actually honoured.
+        return Mage::getSingleton('admin/session')->isAllowed('admin/customer/b2baccess_rules');
     }
 
     protected function _initAction(): self
@@ -222,7 +224,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
             $v = (int) $v;
             $ids[$v] = $v;
         }
-        return json_encode(array_values($ids));
+        return json_encode(array_values($ids)) ?: '[]';
     }
 
     /**
@@ -237,7 +239,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
                 $codes[$c] = $c;
             }
         }
-        return json_encode(array_values($codes));
+        return json_encode(array_values($codes)) ?: '[]';
     }
 
     /**

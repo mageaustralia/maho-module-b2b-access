@@ -246,10 +246,13 @@ class MageAustralia_B2bAccess_Model_Gate
 
     private function ruleHasAction(MageAustralia_B2bAccess_Model_Gate_Rule $rule, string $action): bool
     {
+        // Enforcement-aware: visibility actions require visibility enforcement,
+        // blocking purchase requires checkout enforcement. Mirrors the helper's
+        // product-context check so both surfaces agree.
         return match ($action) {
-            'hide_price'     => $rule->hidePrice,
-            'hide_listing'   => $rule->hideListing,
-            'block_purchase' => $rule->blockPurchase,
+            'hide_price'     => $rule->hidePrice && $rule->enforcesVisibility(),
+            'hide_listing'   => $rule->hideListing && $rule->enforcesVisibility(),
+            'block_purchase' => $rule->blockPurchase && $rule->enforcesCheckout(),
             default          => false,
         };
     }

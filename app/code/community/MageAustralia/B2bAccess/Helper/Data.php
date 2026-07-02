@@ -160,9 +160,14 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
         }
 
         foreach ($this->gate()->matchingRules($product, $storeId, $groupId, $this->getCurrentCountryCode()) as $rule) {
-            if (($action === 'hide_price' && $rule->hidePrice)
-                || ($action === 'hide_listing' && $rule->hideListing)
-                || ($action === 'block_purchase' && $rule->blockPurchase)
+            // Visibility actions (hide price/listing) require visibility
+            // enforcement; blocking add-to-cart is a checkout action. This keeps
+            // the Enforcement selector meaningful: a "checkout only" rule must
+            // not hide prices while browsing, and a "visibility only" rule must
+            // not block purchasing.
+            if (($action === 'hide_price' && $rule->hidePrice && $rule->enforcesVisibility())
+                || ($action === 'hide_listing' && $rule->hideListing && $rule->enforcesVisibility())
+                || ($action === 'block_purchase' && $rule->blockPurchase && $rule->enforcesCheckout())
             ) {
                 return true;
             }
@@ -213,7 +218,7 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
                 $this->getCustomerGroupId(),
                 $this->getCurrentCountryCode(),
             ) as $rule) {
-                if ($rule->hidePrice && $rule->message !== null && $rule->message !== '') {
+                if ($rule->hidePrice && $rule->enforcesVisibility() && $rule->message !== null && $rule->message !== '') {
                     return $rule->message;
                 }
             }
@@ -255,18 +260,21 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
         $country = $this->getQuoteCountryCode($quote);
         $gate = $this->gate();
 
+        // Evaluate every item, including the child simples of configurable/bundle
+        // lines: a rule can be scoped by product id to the child, which the parent
+        // (configurable) product would not match. Report the customer-facing name,
+        // which for a child is its parent line's name.
         $blocked = [];
         foreach ($quote->getAllItems() as $item) {
             /** @var Mage_Sales_Model_Quote_Item $item */
-            if ($item->getParentItemId()) {
-                continue; // child of a configurable/bundle; the parent carries the gate
-            }
             $product = $item->getProduct();
             if (!$product instanceof Mage_Catalog_Model_Product) {
                 continue;
             }
             if ($gate->isPurchaseBlockedAtCheckout($product, $storeId, $groupId, $country)) {
-                $blocked[$item->getName()] = (string) $item->getName();
+                $parent = $item->getParentItem();
+                $name = (string) ($parent ? $parent->getName() : $item->getName());
+                $blocked[$name] = $name;
             }
         }
         return array_values($blocked);
