@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Maho
+ *
+ * @package    MageAustralia_B2bAccess
+ * @copyright  Copyright (c) 2026 Mage Australia
+ * @license    https://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
+ */
+-->
+<layout version="0.1.0">
+
+    <!-- Rules grid -->
+    <adminhtml_b2baccess_rule_index>
+        <reference name="content">
+            <block type="b2baccess/adminhtml_rule" name="b2baccess.rule"/>
+        </reference>
+    </adminhtml_b2baccess_rule_index>
+
+    <!-- Rules grid AJAX endpoint -->
+    <adminhtml_b2baccess_rule_grid>
+        <block type="core/text_list" name="root" output="toHtml">
+            <block type="b2baccess/adminhtml_rule_grid" name="b2baccess.rule.grid"/>
+        </block>
+    </adminhtml_b2baccess_rule_grid>
+
+    <!-- Rule edit form. The container auto-creates its
+         b2baccess/adminhtml_rule_edit_form child (mode = edit). -->
+    <adminhtml_b2baccess_rule_edit>
+        <reference name="content">
+            <block type="b2baccess/adminhtml_rule_edit" name="b2baccess.rule.edit"/>
+        </reference>
+    </adminhtml_b2baccess_rule_edit>
+
+</layout>

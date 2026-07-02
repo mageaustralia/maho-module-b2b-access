@@ -11,7 +11,7 @@
 <config>
     <modules>
         <MageAustralia_B2bAccess>
-            <version>1.0.0</version>
+            <version>1.1.0</version>
         </MageAustralia_B2bAccess>
     </modules>
 
@@ -21,11 +21,31 @@
                 <class>MageAustralia_B2bAccess_Helper</class>
             </b2baccess>
         </helpers>
+        <blocks>
+            <b2baccess>
+                <class>MageAustralia_B2bAccess_Block</class>
+            </b2baccess>
+        </blocks>
         <models>
             <b2baccess>
                 <class>MageAustralia_B2bAccess_Model</class>
+                <resourceModel>b2baccess_resource</resourceModel>
             </b2baccess>
+            <b2baccess_resource>
+                <class>MageAustralia_B2bAccess_Model_Resource</class>
+                <entities>
+                    <rule><table>b2baccess_rule</table></rule>
+                    <rule_product><table>b2baccess_rule_product</table></rule_product>
+                </entities>
+            </b2baccess_resource>
         </models>
+        <resources>
+            <b2baccess_setup>
+                <setup>
+                    <module>MageAustralia_B2bAccess</module>
+                </setup>
+            </b2baccess_setup>
+        </resources>
         <!--
              Observers are registered via #[Maho\Config\Observer] PHP attributes
              on Model/Observer.php (compiled at composer dump-autoload into
@@ -45,7 +65,24 @@
         </translate>
     </frontend>
 
+    <admin>
+        <routers>
+            <adminhtml>
+                <args>
+                    <modules>
+                        <mageaustralia_b2baccess before="Mage_Adminhtml">MageAustralia_B2bAccess_Adminhtml</mageaustralia_b2baccess>
+                    </modules>
+                </args>
+            </adminhtml>
+        </routers>
+    </admin>
+
     <adminhtml>
+        <layout>
+            <updates>
+                <mageaustralia_b2baccess><file>mageaustralia_b2baccess.xml</file></mageaustralia_b2baccess>
+            </updates>
+        </layout>
         <translate>
             <modules>
                 <MageAustralia_B2bAccess>
@@ -61,6 +98,7 @@
         <b2baccess>
             <general>
                 <enabled>0</enabled>
+                <mode>basic</mode>
             </general>
             <login>
                 <required>0</required>
@@ -69,6 +107,7 @@
             </login>
             <price>
                 <hide>0</hide>
+                <hide_listing>0</hide_listing>
                 <message>Log in to see pricing.</message>
                 <block_purchase>1</block_purchase>
             </price>

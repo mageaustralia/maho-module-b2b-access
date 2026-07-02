@@ -3,3 +3,7 @@ vendor/
 .DS_Store
 *.swp
 ._*
+
+/.phpunit.cache/
+/vendor/
+/composer.lock
