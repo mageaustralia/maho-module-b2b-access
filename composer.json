@@ -23,6 +23,9 @@
         "php": "^8.3",
         "mahocommerce/maho": "^26.5"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0"
+    },
     "autoload": {
         "psr-0": {
             "MageAustralia_B2bAccess": "app/code/community"

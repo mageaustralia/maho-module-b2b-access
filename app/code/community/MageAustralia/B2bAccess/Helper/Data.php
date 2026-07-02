@@ -11,27 +11,29 @@ declare(strict_types=1);
  */
 
 /**
- * B2B access gate decisions. Two independent gates, both server-side:
+ * B2B access gate - public API for the enforcement layer (observers, checkout
+ * guard, Meilisearch subscriber). Two independent concerns:
  *
- *  - Login wall: when enabled, guests are redirected to a CMS page (or the
- *    login page) on every frontend action except the auth/CMS surfaces they
- *    need to actually log in.
- *  - Price / purchase gate: an activation matrix - active when the current
- *    customer group is in the configured list OR the product sits in a gated
- *    category (subcategories inherit). When active, prices are replaced with a
- *    message and add-to-cart is rejected server-side.
- *
- * All config is store-scoped (Mage::getStoreConfig). No state; pure helper.
+ *  - Login wall: when enabled, guests are redirected to a CMS page (or the login
+ *    page) on every frontend action except the auth/CMS surfaces they need to
+ *    actually log in. Config-driven, no rules involved.
+ *  - Visibility / price / purchase gate: delegated to
+ *    {@see MageAustralia_B2bAccess_Model_Gate}, which resolves rules from either
+ *    system config (basic mode) or the rule table (rules mode). This helper only
+ *    supplies request context (current group, store, country) and forwards
+ *    decisions.
  */
 class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
 {
     protected $_moduleName = 'MageAustralia_B2bAccess';
 
     public const XML_ENABLED         = 'b2baccess/general/enabled';
+    public const XML_MODE            = 'b2baccess/general/mode';
     public const XML_LOGIN_REQUIRED  = 'b2baccess/login/required';
     public const XML_LOGIN_REDIRECT  = 'b2baccess/login/redirect_cms';
     public const XML_LOGIN_MESSAGE   = 'b2baccess/login/message';
     public const XML_HIDE_PRICE      = 'b2baccess/price/hide';
+    public const XML_HIDE_LISTING    = 'b2baccess/price/hide_listing';
     public const XML_PRICE_MESSAGE   = 'b2baccess/price/message';
     public const XML_BLOCK_PURCHASE  = 'b2baccess/price/block_purchase';
     public const XML_BY_CUSTOMER     = 'b2baccess/matrix/by_customer';
@@ -39,8 +41,15 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
     public const XML_BY_CATEGORY     = 'b2baccess/matrix/by_category';
     public const XML_CATEGORIES      = 'b2baccess/matrix/categories';
 
-    /** @var list<int>|null memoised gated category ids (incl. descendants) */
-    private ?array $_gatedCategoryIds = null;
+    /** @var list<int>|null memoised list of every real customer group id incl. guest */
+    private ?array $_allGroupIds = null;
+
+    public function gate(): MageAustralia_B2bAccess_Model_Gate
+    {
+        /** @var MageAustralia_B2bAccess_Model_Gate $gate */
+        $gate = Mage::getSingleton('b2baccess/gate');
+        return $gate;
+    }
 
     public function isEnabled(?int $storeId = null): bool
     {
@@ -55,6 +64,29 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
     public function getCustomerGroupId(): int
     {
         return (int) Mage::getSingleton('customer/session')->getCustomerGroupId();
+    }
+
+    public function getCurrentStoreId(): int
+    {
+        return (int) Mage::app()->getStore()->getId();
+    }
+
+    /**
+     * Best-effort current country for visibility-layer matching. A logged-in
+     * customer's default shipping country is authoritative; otherwise we return
+     * null ("unknown") and let country-scoped rules fall through to the checkout
+     * guard, which always has a real shipping address. GeoIP, when present, can
+     * be layered on later without changing callers.
+     */
+    public function getCurrentCountryCode(): ?string
+    {
+        if ($this->isLoggedIn()) {
+            $address = Mage::getSingleton('customer/session')->getCustomer()->getDefaultShippingAddress();
+            if ($address && $address->getCountryId()) {
+                return strtoupper((string) $address->getCountryId());
+            }
+        }
+        return null;
     }
 
     /* ---------------- login wall ---------------- */
@@ -108,90 +140,133 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
         return trim((string) Mage::getStoreConfig(self::XML_LOGIN_MESSAGE));
     }
 
-    /* ---------------- price / purchase gate ---------------- */
+    /* ---------------- visibility / price / purchase gate ---------------- */
 
     /**
-     * The activation matrix: true when prices/purchasing should be gated for the
-     * current request. By-customer-group OR by-category (either is enough).
+     * True when at least one in-force rule with the given action covers the
+     * product for the current customer/country context. With no product context
+     * (e.g. the listing toolbar) it answers the group-only catalog-wide question.
      */
-    public function customerGateApplies(?Mage_Catalog_Model_Product $product = null): bool
+    private function ruleActionApplies(string $action, ?Mage_Catalog_Model_Product $product): bool
     {
-        if (Mage::getStoreConfigFlag(self::XML_BY_CUSTOMER)
-            && in_array($this->getCustomerGroupId(), $this->getGatedGroupIds(), true)
-        ) {
-            return true;
+        if (!$this->isEnabled()) {
+            return false;
         }
-        if (Mage::getStoreConfigFlag(self::XML_BY_CATEGORY)
-            && $product instanceof Mage_Catalog_Model_Product
-            && $this->productInGatedCategory($product)
-        ) {
-            return true;
+        $storeId = $this->getCurrentStoreId();
+        $groupId = $this->getCustomerGroupId();
+
+        if (!$product instanceof Mage_Catalog_Model_Product) {
+            return $this->gate()->groupGateApplies($storeId, $groupId, $action);
+        }
+
+        foreach ($this->gate()->matchingRules($product, $storeId, $groupId, $this->getCurrentCountryCode()) as $rule) {
+            if (($action === 'hide_price' && $rule->hidePrice)
+                || ($action === 'hide_listing' && $rule->hideListing)
+                || ($action === 'block_purchase' && $rule->blockPurchase)
+            ) {
+                return true;
+            }
         }
         return false;
     }
 
     public function shouldHidePrice(?Mage_Catalog_Model_Product $product = null): bool
     {
-        return $this->isEnabled()
-            && Mage::getStoreConfigFlag(self::XML_HIDE_PRICE)
-            && $this->customerGateApplies($product);
+        return $this->ruleActionApplies('hide_price', $product);
+    }
+
+    public function shouldHideListing(?Mage_Catalog_Model_Product $product = null): bool
+    {
+        return $this->ruleActionApplies('hide_listing', $product);
     }
 
     public function shouldBlockPurchase(?Mage_Catalog_Model_Product $product = null): bool
     {
-        return $this->isEnabled()
-            && Mage::getStoreConfigFlag(self::XML_BLOCK_PURCHASE)
-            && $this->customerGateApplies($product);
-    }
-
-    public function getPriceMessage(): string
-    {
-        return trim((string) Mage::getStoreConfig(self::XML_PRICE_MESSAGE));
-    }
-
-    /** @return list<int> */
-    public function getGatedGroupIds(): array
-    {
-        return $this->_csvInts((string) Mage::getStoreConfig(self::XML_CUSTOMER_GROUPS));
-    }
-
-    public function productInGatedCategory(Mage_Catalog_Model_Product $product): bool
-    {
-        $gated = $this->_getGatedCategoryIds();
-        if ($gated === []) {
-            return false;
-        }
-        $productCats = array_map('intval', (array) $product->getCategoryIds());
-        return array_intersect($productCats, $gated) !== [];
+        return $this->ruleActionApplies('block_purchase', $product);
     }
 
     /**
-     * Configured gated categories expanded to include all descendants, so a
-     * product in any subcategory of a gated category is gated too. Memoised.
+     * Customer-group ids this product must be hidden from in Meilisearch, for the
+     * given store. Delegates to the gate; see its docblock for the "any group"
+     * expansion and why country scope is excluded.
      *
      * @return list<int>
      */
-    private function _getGatedCategoryIds(): array
+    public function getRestrictedGroupIdsForProduct(Mage_Catalog_Model_Product $product, int $storeId): array
     {
-        if ($this->_gatedCategoryIds !== null) {
-            return $this->_gatedCategoryIds;
+        if (!$this->isEnabled($storeId)) {
+            return [];
         }
-        $set = [];
-        foreach ($this->_csvInts((string) Mage::getStoreConfig(self::XML_CATEGORIES)) as $id) {
-            $set[$id] = true;
-            /** @var Mage_Catalog_Model_Category $cat */
-            $cat = Mage::getModel('catalog/category')->load($id);
-            if ($cat->getId()) {
-                foreach ($this->_csvInts((string) $cat->getAllChildren()) as $child) {
-                    $set[$child] = true;
+        return $this->gate()->getRestrictedGroupIds($product, $storeId);
+    }
+
+    /**
+     * Message to show in place of a hidden price. A matching rule's own message
+     * wins; otherwise the store-level default.
+     */
+    public function getPriceMessage(?Mage_Catalog_Model_Product $product = null): string
+    {
+        if ($product instanceof Mage_Catalog_Model_Product && $this->isEnabled()) {
+            foreach ($this->gate()->matchingRules(
+                $product,
+                $this->getCurrentStoreId(),
+                $this->getCustomerGroupId(),
+                $this->getCurrentCountryCode(),
+            ) as $rule) {
+                if ($rule->hidePrice && $rule->message !== null && $rule->message !== '') {
+                    return $rule->message;
                 }
             }
         }
-        return $this->_gatedCategoryIds = array_keys($set);
+        return trim((string) Mage::getStoreConfig(self::XML_PRICE_MESSAGE));
+    }
+
+    /* ---------------- config accessors (used by the gate) ---------------- */
+
+    /**
+     * Raw configured gated groups (basic mode). Unexpanded, as entered.
+     *
+     * @return list<int>
+     */
+    public function getGatedGroupIds(): array
+    {
+        return $this->csvInts((string) Mage::getStoreConfig(self::XML_CUSTOMER_GROUPS));
+    }
+
+    /**
+     * Raw configured gated categories (basic mode). Descendant expansion is the
+     * gate's job.
+     *
+     * @return list<int>
+     */
+    public function getConfiguredCategoryIds(): array
+    {
+        return $this->csvInts((string) Mage::getStoreConfig(self::XML_CATEGORIES));
+    }
+
+    /**
+     * Every real customer group id, including NOT LOGGED IN (guests) and
+     * excluding the synthetic ALL group. Used to expand an "any group" rule into
+     * a concrete restricted-group list for the search index. Memoised.
+     *
+     * @return list<int>
+     */
+    public function getAllGroupIds(): array
+    {
+        if ($this->_allGroupIds !== null) {
+            return $this->_allGroupIds;
+        }
+        $ids = [Mage_Customer_Model_Group::NOT_LOGGED_IN_ID];
+        /** @var Mage_Customer_Model_Resource_Group_Collection $groups */
+        $groups = Mage::getResourceModel('customer/group_collection')->setRealGroupsFilter();
+        foreach ($groups as $group) {
+            $ids[] = (int) $group->getId();
+        }
+        return $this->_allGroupIds = array_values(array_unique($ids));
     }
 
     /** @return list<int> */
-    private function _csvInts(string $csv): array
+    public function csvInts(string $csv): array
     {
         return array_values(array_unique(array_map(
             'intval',

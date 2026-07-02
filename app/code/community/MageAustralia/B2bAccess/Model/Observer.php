@@ -84,9 +84,78 @@ class MageAustralia_B2bAccess_Model_Observer
         if (!$transport) {
             return;
         }
-        $msg = $this->helper()->getPriceMessage();
+        $msg = $this->helper()->getPriceMessage($product);
         $transport->setHtml(
             '<span class="b2b-access__price-hidden">' . $this->helper()->escapeHtml($msg) . '</span>',
+        );
+    }
+
+    /**
+     * Hide listing: drop gated products from category / search product-list
+     * collections before they load. Fires only for the product-list block's
+     * collection (not every collection load), so admin grids, the cart, related
+     * products etc. are untouched. When a catalog-wide rule matches, the whole
+     * collection is emptied.
+     */
+    #[MahoObserver('catalog_block_product_list_collection', area: 'frontend', type: 'singleton')]
+    public function hideListing(Observer $observer): void
+    {
+        $helper = $this->helper();
+        if (!$helper->isEnabled()) {
+            return;
+        }
+        $collection = $observer->getEvent()->getCollection();
+        if (!$collection instanceof Mage_Catalog_Model_Resource_Product_Collection) {
+            return;
+        }
+
+        $storeId = $helper->getCurrentStoreId();
+        $groupId = $helper->getCustomerGroupId();
+        $country = $helper->getCurrentCountryCode();
+        $gate = $helper->gate();
+
+        if ($gate->hidesEntireCatalog($storeId, $groupId, $country)) {
+            $collection->getSelect()->where('1 = 0');
+            return;
+        }
+
+        $hiddenIds = $gate->getHiddenProductIds($storeId, $groupId, $country);
+        if ($hiddenIds !== []) {
+            $collection->addFieldToFilter('entity_id', ['nin' => $hiddenIds]);
+        }
+    }
+
+    /**
+     * Contribute this rule set's group restrictions to the Meilisearch product
+     * index. The search module dispatches `meilisearch_product_restrictions`
+     * once per product per store during reindex; we push the customer-group ids
+     * the product is hidden from so it never surfaces in search for them. No-op
+     * when the search module isn't installed (the event simply never fires).
+     */
+    #[MahoObserver('meilisearch_product_restrictions', type: 'singleton')]
+    public function contributeSearchRestrictions(Observer $observer): void
+    {
+        $product = $observer->getEvent()->getProduct();
+        if (!$product instanceof Mage_Catalog_Model_Product) {
+            return;
+        }
+        $transport = $observer->getEvent()->getTransport();
+        if (!$transport) {
+            return;
+        }
+        $storeId = (int) $observer->getEvent()->getStoreId();
+        if (!$this->helper()->isEnabled($storeId)) {
+            return;
+        }
+
+        $restricted = $this->helper()->getRestrictedGroupIdsForProduct($product, $storeId);
+        if ($restricted === []) {
+            return;
+        }
+        $existing = (array) $transport->getData('restricted_customer_group_ids');
+        $transport->setData(
+            'restricted_customer_group_ids',
+            array_values(array_unique(array_merge($existing, $restricted))),
         );
     }
 

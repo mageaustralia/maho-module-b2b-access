@@ -61,6 +61,7 @@
         <b2baccess>
             <general>
                 <enabled>0</enabled>
+                <mode>basic</mode>
             </general>
             <login>
                 <required>0</required>
@@ -69,6 +70,7 @@
             </login>
             <price>
                 <hide>0</hide>
+                <hide_listing>0</hide_listing>
                 <message>Log in to see pricing.</message>
                 <block_purchase>1</block_purchase>
             </price>
