@@ -120,22 +120,31 @@ configuration; the grid governs Rules mode only.
 
 ---
 
-## Meilisearch integration
+## Search integration
 
-When [maho-module-meilisearch](https://github.com/mageaustralia/maho-module-meilisearch)
-is installed, this module keeps search results consistent with the gate. It
-subscribes to that module's `meilisearch_product_restrictions` event and
-contributes, per product per store, the customer-group IDs the product is hidden
-from (from every `visibility`/`both` hide-listing rule that covers it). The
-index carries a `restricted_customer_group_ids` field and the storefront filters
-each query with `restricted_customer_group_ids != <currentGroupId>`, so a
-restricted product never appears in autocomplete or search for the wrong group.
+This module keeps search results consistent with the gate: a product hidden by a
+`visibility`/`both` hide-listing rule never appears in search for a restricted
+group. It works with whichever search engine is installed, by subscribing to the
+engine's per-product restriction event during reindex and contributing the
+customer-group IDs the product is hidden from:
 
-- Run a full Meilisearch reindex after adding or changing hide-listing rules.
-- Zero coupling: with the search module absent the event never fires and nothing
-  breaks; with it present it works with no extra configuration.
-- Country scope is intentionally **not** pushed into the (geo-agnostic,
-  CDN-cacheable) index; country is enforced server-side at checkout.
+- [maho-module-meilisearch](https://github.com/mageaustralia/maho-module-meilisearch)
+  - `meilisearch_product_restrictions`. The index carries a
+  `restricted_customer_group_ids` field and the storefront filters each query
+  with `restricted_customer_group_ids != <currentGroupId>`.
+- [maho-search](https://github.com/mageaustralia/maho-search) (pure-PHP Lucene)
+  and any other engine - the neutral `catalog_search_product_restrictions`. The
+  restricted groups are stored on the document and matching results are dropped
+  for the current group at query time.
+
+Notes:
+
+- Run a full reindex after adding or changing hide-listing rules.
+- Zero coupling: with no search module installed the events never fire and
+  nothing breaks; with one present it works with no extra configuration.
+- Country scope is intentionally **not** pushed into the search index (it is
+  geo-agnostic and, for Meilisearch, CDN-cacheable); country is enforced
+  server-side at checkout.
 
 ---
 
@@ -183,7 +192,8 @@ Every behaviour is server-side; hiding UI alone is never relied upon.
 | Hide from listings | `catalog_block_product_list_collection` (filter collection) |
 | Block add-to-cart | `controller_action_predispatch_checkout_cart_add` / `_addgroup` |
 | Country / purchase guard | `sales_model_service_quote_submit_before` (abort submit) |
-| Search restrictions | `meilisearch_product_restrictions` (contribute group IDs) |
+| Search restrictions (Meilisearch) | `meilisearch_product_restrictions` (contribute group IDs) |
+| Search restrictions (Lucene / other) | `catalog_search_product_restrictions` (contribute group IDs) |
 
 The add-to-cart guard also throws server-side, so a crafted
 `?product=...&qty=` URL cannot bypass a hidden button. The checkout guard fires
