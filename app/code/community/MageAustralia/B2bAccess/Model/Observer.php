@@ -128,15 +128,11 @@ class MageAustralia_B2bAccess_Model_Observer
     /**
      * Contribute this rule set's group restrictions to a search index, so a
      * hidden product never surfaces in search for the wrong customer group. Fires
-     * once per product per store during reindex, for every search engine that
-     * asks:
-     *   - Meilisearch: `meilisearch_product_restrictions`
-     *   - Lucene (maho-search) and any other engine: the neutral
-     *     `catalog_search_product_restrictions`
-     * The payload is identical (product, store_id, transport), so one handler
-     * serves all. No-op when no search module is installed (the events never fire).
+     * once per product per store during reindex, via the engine-neutral
+     * `catalog_search_product_restrictions` event that every search backend
+     * (Meilisearch, the pure-PHP Lucene engine, and any other) dispatches. No-op
+     * when no search module is installed (the event never fires).
      */
-    #[MahoObserver('meilisearch_product_restrictions', type: 'singleton')]
     #[MahoObserver('catalog_search_product_restrictions', type: 'singleton')]
     public function contributeSearchRestrictions(Observer $observer): void
     {

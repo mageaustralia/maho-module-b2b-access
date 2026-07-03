@@ -3,15 +3,15 @@
 A B2B access-control gate for Maho 26.5+. Require login to view the store, hide
 prices, hide products entirely, and block purchasing, scoped by customer group,
 category, destination country or individual product. Everything is enforced on
-the server (observers and a checkout guard), reflected in Meilisearch search
-results, and configurable as either a single simple gate or a full rules engine.
-No core rewrites.
+the server (observers and a checkout guard), reflected in search results, and
+configurable as either a single simple gate or a full rules engine. No core
+rewrites.
 
 - **Maho / OpenMage** module (community codepool), PHP 8.3+.
 - Modernised conventions: `declare(strict_types=1)`, PHP attribute observers and
   routes, OSL-3.0, no Zend, no Prototype.
-- Soft integrations only: works standalone; gets richer when
-  `maho-module-meilisearch` and `maho-module-geoip` are present.
+- Soft integrations only: works standalone; gets richer when a search engine
+  (`maho-module-meilisearch` or `maho-search`) and `maho-module-geoip` are present.
 
 ---
 
@@ -124,18 +124,17 @@ configuration; the grid governs Rules mode only.
 
 This module keeps search results consistent with the gate: a product hidden by a
 `visibility`/`both` hide-listing rule never appears in search for a restricted
-group. It works with whichever search engine is installed, by subscribing to the
-engine's per-product restriction event during reindex and contributing the
-customer-group IDs the product is hidden from:
+group. It subscribes once to the engine-neutral
+`catalog_search_product_restrictions` event, which every search backend
+dispatches per product during reindex, and contributes the customer-group IDs the
+product is hidden from. Supported engines:
 
 - [maho-module-meilisearch](https://github.com/mageaustralia/maho-module-meilisearch)
-  - `meilisearch_product_restrictions`. The index carries a
-  `restricted_customer_group_ids` field and the storefront filters each query
-  with `restricted_customer_group_ids != <currentGroupId>`.
-- [maho-search](https://github.com/mageaustralia/maho-search) (pure-PHP Lucene)
-  and any other engine - the neutral `catalog_search_product_restrictions`. The
-  restricted groups are stored on the document and matching results are dropped
-  for the current group at query time.
+  - the index carries a `restricted_customer_group_ids` field and the storefront
+  filters each query with `restricted_customer_group_ids != <currentGroupId>`.
+- [maho-search](https://github.com/mageaustralia/maho-search) (pure-PHP Lucene) -
+  the restricted groups are stored on the document and matching results are
+  dropped for the current group at query time.
 
 Notes:
 
@@ -162,7 +161,7 @@ Mapping: customer groups, stores, categories and product links carry across;
 `remove_product_links` becomes hide-listing, `hide_price` becomes hide-price,
 purchasing is blocked, and enforcement is set to `both`. It is idempotent
 (imported rules are named `Groupcat: <name>` and skipped on re-run). Afterward,
-set Mode = Rules and reindex Meilisearch.
+set Mode = Rules and reindex your search engine.
 
 ---
 
@@ -192,8 +191,7 @@ Every behaviour is server-side; hiding UI alone is never relied upon.
 | Hide from listings | `catalog_block_product_list_collection` (filter collection) |
 | Block add-to-cart | `controller_action_predispatch_checkout_cart_add` / `_addgroup` |
 | Country / purchase guard | `sales_model_service_quote_submit_before` (abort submit) |
-| Search restrictions (Meilisearch) | `meilisearch_product_restrictions` (contribute group IDs) |
-| Search restrictions (Lucene / other) | `catalog_search_product_restrictions` (contribute group IDs) |
+| Search restrictions (any engine) | `catalog_search_product_restrictions` (contribute group IDs) |
 
 The add-to-cart guard also throws server-side, so a crafted
 `?product=...&qty=` URL cannot bypass a hidden button. The checkout guard fires
@@ -231,7 +229,7 @@ event this module uses. Push integer group IDs onto the transport's
 `restricted_customer_group_ids` array:
 
 ```php
-#[\Maho\Config\Observer('meilisearch_product_restrictions')]
+#[\Maho\Config\Observer('catalog_search_product_restrictions')]
 public function addRestrictions(\Maho\Event\Observer $observer): void
 {
     $transport = $observer->getEvent()->getTransport();
