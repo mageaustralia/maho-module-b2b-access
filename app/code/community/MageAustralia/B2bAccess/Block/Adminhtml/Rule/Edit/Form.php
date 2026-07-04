@@ -82,15 +82,40 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
             'can_be_empty' => true,
             'note' => $helper->__('Matched against the shipping country at checkout.'),
         ]);
-        $scope->addField('scope_category_ids', 'text', [
-            'name' => 'scope_category_ids', 'label' => $helper->__('Category IDs'),
-            'note' => $helper->__('Comma-separated. Subcategories are included automatically.'),
-        ]);
-        $scope->addField('product_tokens', 'textarea', [
-            'name' => 'product_tokens', 'label' => $helper->__('Products'),
-            'style' => 'height:5em',
-            'note' => $helper->__('SKUs or numeric product IDs, separated by spaces, commas or new lines.'),
-        ]);
+        // The flat category-ID / product-token fields are gone as of v1.2 -
+        // product matching now lives in the condition tree below, which composes
+        // categories, SKUs, attributes and price into a single expressive tree.
+        // The scope_category_ids column + b2baccess_rule_product table remain
+        // for backwards-compat with pre-v1.2 rules (see the Gate fallback path).
+
+        /* ---- Product matching (Catalog-Rule-style condition tree) ---- */
+        // Same pattern as Mage_Adminhtml_Block_Promo_Catalog_Edit_Tab_Conditions
+        // - Mage::getBlockSingleton() returns the layout singleton the fieldset
+        // renderer + rule/conditions widget need. Returns false only in the
+        // absence of a dispatched front controller action (CLI); safe here
+        // because this block only ever renders inside the admin request.
+        $conditionsRenderer = Mage::getBlockSingleton('adminhtml/widget_form_renderer_fieldset')
+            ->setTemplate('promo/fieldset.phtml')
+            ->setNewChildUrl(
+                $this->getUrl('*/*/newConditionHtml/form/conditions_fieldset'),
+            );
+
+        $conditions = $form->addFieldset('conditions_fieldset', [
+            'legend' => $helper->__('Product matching (leave empty to match every product in scope)'),
+            'comment' => $helper->__(
+                'Reuses the standard Catalog Rule condition tree so you can match '
+                . 'on attributes (brand = Head, colour = Black, ...), SKUs, price, '
+                . 'category, or any combination. Empty tree = rule fires on every '
+                . 'product that falls within the scope above.',
+            ),
+        ])->setRenderer($conditionsRenderer);
+
+        $conditions->addField('conditions', 'text', [
+            'name' => 'conditions',
+            'label' => $helper->__('Product conditions'),
+            'title' => $helper->__('Product conditions'),
+            'required' => false,
+        ])->setRule($rule)->setRenderer(Mage::getBlockSingleton('rule/conditions'));
 
         /* ---- Actions ---- */
         $actions = $form->addFieldset('actions', ['legend' => $helper->__('Actions')]);
@@ -152,8 +177,6 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
             'scope_group_ids' => $rule->getGroupIdsArray(),
             'scope_store_ids' => $rule->getStoreIdsArray(),
             'scope_country_codes' => $rule->getCountryCodesArray(),
-            'scope_category_ids' => implode(', ', $rule->getCategoryIdsArray()),
-            'product_tokens' => implode("\n", $this->productSkus($rule->getProductIdsArray())),
             'action_hide_listing' => (int) $rule->getActionHideListing(),
             'action_hide_price' => (int) $rule->getActionHidePrice(),
             'action_block_purchase' => (int) $rule->getActionBlockPurchase(),
@@ -178,26 +201,4 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
         return $options;
     }
 
-    /**
-     * Resolve product ids back to SKUs for display in the textarea.
-     *
-     * @param list<int> $productIds
-     * @return list<string>
-     */
-    private function productSkus(array $productIds): array
-    {
-        if ($productIds === []) {
-            return [];
-        }
-        /** @var Mage_Catalog_Model_Resource_Product_Collection $collection */
-        $collection = Mage::getResourceModel('catalog/product_collection')
-            ->addAttributeToSelect('sku')
-            ->addFieldToFilter('entity_id', ['in' => $productIds]);
-        $skus = [];
-        foreach ($collection as $product) {
-            $skus[] = (string) $product->getSku();
-        }
-        sort($skus);
-        return $skus;
-    }
 }

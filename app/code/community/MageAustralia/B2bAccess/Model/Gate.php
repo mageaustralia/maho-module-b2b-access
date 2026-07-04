@@ -93,6 +93,7 @@ class MageAustralia_B2bAccess_Model_Gate
                 && $rule->matchesStore($storeId)
                 && $rule->matchesCountry($countryCode)
                 && $rule->coversProduct($productId, $productCategoryIds)
+                && $rule->matchesConditions($product)
             ) {
                 $matched[] = $rule;
             }
@@ -144,6 +145,9 @@ class MageAustralia_B2bAccess_Model_Gate
                 continue;
             }
             if (!$rule->coversProduct($productId, $productCategoryIds)) {
+                continue;
+            }
+            if (!$rule->matchesConditions($product)) {
                 continue;
             }
             $ruleGroups = $rule->groupIds === [] ? $this->helper()->getAllGroupIds() : $rule->groupIds;
