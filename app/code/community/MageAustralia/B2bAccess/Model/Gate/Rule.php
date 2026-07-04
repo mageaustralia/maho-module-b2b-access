@@ -39,6 +39,9 @@ class MageAustralia_B2bAccess_Model_Gate_Rule
      * @param list<string> $countryCodes  ISO-3166-1 alpha-2 (upper); [] = any country
      * @param list<int>    $categoryIds   gated categories (already expanded to include descendants)
      * @param list<int>    $productIds    directly gated products
+     * @param MageAustralia_B2bAccess_Model_Rule|null $ruleModel  live model (rules mode)
+     *   carrying the condition tree. Basic-mode synthesised rules pass null and
+     *   fall back to the flat categoryIds/productIds match.
      */
     public function __construct(
         public readonly int|string $id,
@@ -55,12 +58,34 @@ class MageAustralia_B2bAccess_Model_Gate_Rule
         public readonly string $enforcement,
         public readonly ?string $message,
         public readonly int $priority = 0,
+        public readonly ?MageAustralia_B2bAccess_Model_Rule $ruleModel = null,
     ) {}
 
-    /** True when this rule has no product/category scope and therefore covers everything. */
+    /**
+     * True when this rule has no product/category scope and no condition tree,
+     * so it covers every product. The condition-tree check reads from the live
+     * model - a rule with only a tree ("brand = Head") is NOT catalog-wide.
+     */
     public function isCatalogWide(): bool
     {
-        return $this->categoryIds === [] && $this->productIds === [];
+        if ($this->categoryIds !== [] || $this->productIds !== []) {
+            return false;
+        }
+        return $this->ruleModel === null || !$this->ruleModel->hasConditions();
+    }
+
+    /**
+     * True when this rule matches an individual product's attributes / SKU /
+     * price / etc. via its condition tree. Rules without a tree return true
+     * (they match every product; the fast path in {@see coversProduct()}
+     * handles the flat category/product ID case).
+     */
+    public function matchesConditions(Mage_Catalog_Model_Product $product): bool
+    {
+        if ($this->ruleModel === null || !$this->ruleModel->hasConditions()) {
+            return true;
+        }
+        return $this->ruleModel->matchesProduct($product);
     }
 
     public function matchesGroup(int $groupId): bool
@@ -94,15 +119,33 @@ class MageAustralia_B2bAccess_Model_Gate_Rule
     }
 
     /**
-     * Does this rule cover the given product? Catalog-wide rules cover all;
-     * otherwise the product must be directly listed or sit in one of the rule's
-     * (pre-expanded) categories.
+     * Does this rule cover the given product?
+     *
+     * Three ways to cover:
+     *   1. Catalog-wide (no flat scope, no condition tree) - matches everything.
+     *   2. Flat listing - product id in productIds OR one of its categories in
+     *      categoryIds.
+     *   3. Condition tree - the rule model's tree evaluates true for this
+     *      product (see {@see matchesConditions()}).
+     *
+     * Any of the three is enough. Callers that want a full match should also
+     * call matchesConditions() when a Product object is available, because
+     * this method receives only IDs and cannot evaluate attribute conditions.
+     * The Gate calls both in sequence so the tree ANDs with the flat scope.
      *
      * @param list<int> $productCategoryIds the product's category ids
      */
     public function coversProduct(int $productId, array $productCategoryIds): bool
     {
         if ($this->isCatalogWide()) {
+            return true;
+        }
+        // A rule with ONLY a condition tree (no flat products/categories) should
+        // pass this fast-path check - the tree is evaluated separately by the
+        // Gate. Otherwise a "brand = Head" rule would be rejected because it
+        // has no flat scope.
+        $hasFlatScope = $this->categoryIds !== [] || $this->productIds !== [];
+        if (!$hasFlatScope) {
             return true;
         }
         if (in_array($productId, $this->productIds, true)) {

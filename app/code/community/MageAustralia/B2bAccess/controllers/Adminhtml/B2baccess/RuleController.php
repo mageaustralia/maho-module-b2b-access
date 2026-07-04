@@ -123,7 +123,6 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
             $model->setData('scope_group_ids', $this->encodeIntList($data['scope_group_ids'] ?? []));
             $model->setData('scope_store_ids', $this->encodeIntList($data['scope_store_ids'] ?? []));
             $model->setData('scope_country_codes', $this->encodeCountryList($data['scope_country_codes'] ?? []));
-            $model->setData('scope_category_ids', $this->encodeIntList($this->parseCsvInts($data['scope_category_ids'] ?? '')));
 
             // Actions.
             $model->setData('action_hide_listing', (int) (bool) ($data['action_hide_listing'] ?? 0));
@@ -142,8 +141,15 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
             $message = trim((string) ($data['message'] ?? ''));
             $model->setData('message', $message !== '' ? $message : null);
 
-            // Product scope: a textarea of SKUs and/or numeric ids.
-            $model->setProductIdsArray($this->resolveProductTokens((string) ($data['product_tokens'] ?? '')));
+            // Condition tree: comes in as a nested array under the 'conditions'
+            // key (Mage_Rule_Model_Abstract::loadPost transforms it into the
+            // recursive shape the combinator expects and populates the
+            // conditions_serialized column at save time).
+            if (isset($data['rule']) && is_array($data['rule'])) {
+                $model->loadPost($data['rule']);
+            } elseif (isset($data['conditions']) && is_array($data['conditions'])) {
+                $model->loadPost(['conditions' => $data['conditions']]);
+            }
 
             $model->save();
 
@@ -195,6 +201,38 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
         $this->_redirect('*/*/');
     }
 
+    /**
+     * The Mage_Rule condition tree's Add button hits this action to fetch the
+     * HTML for a newly-added condition row. Same shape as Catalog Rule's
+     * newConditionHtmlAction - it just needs the tree's owning rule model to
+     * be a B2bAccess rule so the combinator picks up the right child options.
+     */
+    #[Maho\Config\Route('/admin/b2baccess_rule/newConditionHtml')]
+    public function newConditionHtmlAction(): void
+    {
+        $id = (string) $this->getRequest()->getParam('id');
+        $typeParam = (string) $this->getRequest()->getParam('type');
+        $typeArr = explode('|', str_replace('-', '/', $typeParam));
+        $type = $typeArr[0];
+
+        $model = Mage::getModel($type);
+        if (!$model instanceof Mage_Rule_Model_Condition_Abstract) {
+            $this->getResponse()->setBody('');
+            return;
+        }
+
+        $model->setId($id)
+            ->setType($type)
+            ->setRule(Mage::getModel('b2baccess/rule'))
+            ->setPrefix('conditions');
+        if (!empty($typeArr[1])) {
+            $model->setAttribute($typeArr[1]);
+        }
+        $model->setJsFormObject((string) $this->getRequest()->getParam('form'));
+
+        $this->getResponse()->setBody($model->asHtmlRecursive());
+    }
+
     #[Maho\Config\Route('/admin/b2baccess_rule/massDelete')]
     public function massDeleteAction(): void
     {
@@ -242,55 +280,4 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
         return json_encode(array_values($codes)) ?: '[]';
     }
 
-    /**
-     * @param mixed $value
-     * @return list<int>
-     */
-    private function parseCsvInts($value): array
-    {
-        $out = [];
-        foreach (preg_split('/[\s,]+/', (string) $value) ?: [] as $token) {
-            $token = trim($token);
-            if ($token !== '' && ctype_digit($token)) {
-                $out[(int) $token] = (int) $token;
-            }
-        }
-        return array_values($out);
-    }
-
-    /**
-     * Resolve a free-text list of SKUs and/or numeric product ids to ids.
-     * Numeric tokens are treated as ids; the rest are looked up by SKU in one
-     * query. Unknown tokens are silently dropped.
-     *
-     * @return list<int>
-     */
-    private function resolveProductTokens(string $text): array
-    {
-        $tokens = array_filter(array_map('trim', preg_split('/[\s,]+/', $text) ?: []), 'strlen');
-        if ($tokens === []) {
-            return [];
-        }
-
-        $ids = [];
-        $skus = [];
-        foreach ($tokens as $token) {
-            if (ctype_digit($token)) {
-                $ids[(int) $token] = (int) $token;
-            } else {
-                $skus[] = $token;
-            }
-        }
-
-        if ($skus !== []) {
-            /** @var Mage_Catalog_Model_Resource_Product_Collection $collection */
-            $collection = Mage::getResourceModel('catalog/product_collection')
-                ->addAttributeToFilter('sku', ['in' => array_values(array_unique($skus))]);
-            foreach ($collection->getAllIds() as $pid) {
-                $ids[(int) $pid] = (int) $pid;
-            }
-        }
-
-        return array_values($ids);
-    }
 }

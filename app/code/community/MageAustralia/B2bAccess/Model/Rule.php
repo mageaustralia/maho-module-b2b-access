@@ -11,10 +11,24 @@ declare(strict_types=1);
  */
 
 /**
- * A persisted B2B access rule (rules mode). Scope lists are stored as JSON in
- * single columns except products, which live in the b2baccess_rule_product join
- * table. {@see toGateRule()} converts a loaded row into the immutable value
- * object the enforcement layer consumes.
+ * A persisted B2B access rule (rules mode).
+ *
+ * Two-part model:
+ *  - Flat scope columns (scope_group_ids, scope_store_ids, scope_country_codes,
+ *    scope_category_ids) hold *activation scope* - "where should this rule
+ *    fire". These are JSON blobs so a rule can target multiple groups/stores
+ *    without a join table, and the gate can index them fast.
+ *  - conditions_serialized holds a Mage_Rule condition tree for *product
+ *    matching* - "which products qualify" - built with the standard Catalog Rule
+ *    combinator, so you get attribute conditions (brand = Head), category
+ *    conditions, SKU conditions, price conditions, etc. for free.
+ *
+ * The b2baccess_rule_product link table + scope_category_ids column are legacy
+ * fallbacks kept for rules created before v1.2. If a rule has an empty
+ * conditions tree, the gate falls back to those.
+ *
+ * {@see toGateRule()} converts a loaded row into the immutable value object the
+ * enforcement layer consumes.
  *
  * @method string getName()
  * @method int getIsActive()
@@ -33,12 +47,37 @@ declare(strict_types=1);
  * @method $this setIsActive(int $v)
  * @method $this setPriority(int $v)
  */
-class MageAustralia_B2bAccess_Model_Rule extends Mage_Core_Model_Abstract
+class MageAustralia_B2bAccess_Model_Rule extends Mage_Rule_Model_Abstract
 {
     #[\Override]
     protected function _construct(): void
     {
+        parent::_construct();
         $this->_init('b2baccess/rule');
+    }
+
+    /**
+     * The root combinator for product matching. Reuses the Catalog Rule tree
+     * (Mage_Catalog_Model_Rule_Condition_Combine) so all of Maho's built-in
+     * catalog conditions are available: product attribute, category, SKU,
+     * price, custom attributes, subselection, nested AND/OR combinations.
+     */
+    #[\Override]
+    public function getConditionsInstance()
+    {
+        return Mage::getModel('catalog/rule_condition_combine');
+    }
+
+    /**
+     * We don't use actions - all actions are stored as boolean columns on the
+     * rule row (hide_price / block_purchase / etc.). Return an empty
+     * combinator so Mage_Rule_Model_Abstract::_beforeSave() can serialize
+     * without complaining; it will always serialize to an empty tree.
+     */
+    #[\Override]
+    public function getActionsInstance()
+    {
+        return Mage::getModel('rule/condition_combine');
     }
 
     public function getRuleId(): ?int
@@ -109,6 +148,37 @@ class MageAustralia_B2bAccess_Model_Rule extends Mage_Core_Model_Abstract
         return $this;
     }
 
+    /**
+     * True when the rule has a non-empty product-matching condition tree.
+     * A rule without conditions matches every product (like a Catalog Rule
+     * with an empty tree does).
+     */
+    public function hasConditions(): bool
+    {
+        $conditions = $this->getConditions();
+        $c = $conditions->getConditions();
+        return is_array($c) && count($c) > 0;
+    }
+
+    /**
+     * Evaluate the condition tree against a product. Returns true when the
+     * tree is empty (matches everything) or when the product satisfies the
+     * conditions.
+     */
+    public function matchesProduct(Mage_Catalog_Model_Product $product): bool
+    {
+        if (!$this->hasConditions()) {
+            return true;
+        }
+        try {
+            return (bool) $this->getConditions()->validate($product);
+        } catch (Throwable $e) {
+            // Malformed tree shouldn't take a page down; log and treat as no-match.
+            Mage::logException($e);
+            return false;
+        }
+    }
+
     public function getEnforcementValue(): string
     {
         return in_array($this->getEnforcement(), [
@@ -123,6 +193,8 @@ class MageAustralia_B2bAccess_Model_Rule extends Mage_Core_Model_Abstract
     /**
      * Convert to the immutable enforcement rule. Categories are expanded to
      * include descendants (via the gate, which memoises the tree walk).
+     * The condition-tree object is carried over so the gate can evaluate it
+     * against individual products at match time.
      */
     public function toGateRule(MageAustralia_B2bAccess_Model_Gate $gate): MageAustralia_B2bAccess_Model_Gate_Rule
     {
@@ -144,6 +216,7 @@ class MageAustralia_B2bAccess_Model_Rule extends Mage_Core_Model_Abstract
             enforcement: $this->getEnforcementValue(),
             message: $message !== '' ? $message : null,
             priority: (int) $this->getPriority(),
+            ruleModel: $this,
         );
     }
 
