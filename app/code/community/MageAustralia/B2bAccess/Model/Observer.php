@@ -231,4 +231,64 @@ class MageAustralia_B2bAccess_Model_Observer
             . ' ' . implode(', ', $blocked),
         );
     }
+
+    /**
+     * Headless integration: annotate every product DTO built by the catalog API
+     * with a `b2bAccess` extension block carrying the gate flags evaluated for
+     * the current caller, and strip the price fields when hidePrice is on.
+     *
+     * The storefront reads `product.extensions.b2bAccess.gateFlags` and renders
+     * the login prompt in place of the price / suppresses add-to-cart / redirects
+     * on category-level gates. Because the price is not just flagged but
+     * actually withheld from the response, a crafted client cannot recover it.
+     *
+     * See docs: reference/b2b-integration-pattern.
+     */
+    #[MahoObserver('api_product_dto_build', type: 'singleton')]
+    public function annotateApiDto(Observer $observer): void
+    {
+        $helper = $this->helper();
+        if (!$helper->isEnabled()) {
+            return;
+        }
+
+        $product = $observer->getEvent()->getData('product');
+        $dto = $observer->getEvent()->getData('dto');
+        if (!$product instanceof Mage_Catalog_Model_Product || !is_object($dto)) {
+            return;
+        }
+
+        $hidePrice = $helper->shouldHidePrice($product);
+        $blockPurchase = $helper->shouldBlockPurchase($product);
+        // Login-wall applies site-wide, not per-product; expose it so a
+        // headless storefront can decide whether to redirect off category/PDP
+        // pages when a guest lands on them.
+        $requiresLogin = $helper->isLoginWallActive() && !$helper->isLoggedIn();
+
+        $flags = [
+            'requiresLogin' => $requiresLogin,
+            'hidePrice'     => $hidePrice,
+            'canCheckout'   => !$blockPurchase,
+        ];
+
+        // Namespace under the module code so future B2B modules can add their
+        // own extension blocks under their own keys (myPrice, orderApproval, ...).
+        $existing = (array) ($dto->extensions ?? []);
+        $existing['b2bAccess'] = [
+            'gateFlags'          => $flags,
+            'hiddenPriceMessage' => $hidePrice ? $helper->getPriceMessage($product) : null,
+        ];
+        $dto->extensions = $existing;
+
+        if ($hidePrice) {
+            // The API is the enforcement boundary: withhold the price entirely,
+            // not just flag it. A caller with the flags stripped still cannot
+            // recover the price.
+            foreach (['price', 'finalPrice', 'specialPrice', 'minimalPrice'] as $field) {
+                if (property_exists($dto, $field)) {
+                    $dto->{$field} = null;
+                }
+            }
+        }
+    }
 }
