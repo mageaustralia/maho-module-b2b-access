@@ -181,8 +181,13 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
             'values' => $yesno,
             'note' => $helper->__(
                 'Stronger than hiding the price: the product disappears entirely '
-                . 'from category listings, the search index and layered navigation. '
-                . 'Requires a Meilisearch reindex to take effect in search.',
+                . 'from category listings, layered navigation and search. Search '
+                . 'behaviour depends on the engine: <strong>MySQL</strong> (Maho '
+                . 'default) picks up the change immediately; <strong>Lucene</strong> '
+                . 'reads it live via the same restrictions hook so no reindex is '
+                . 'needed; <strong>Meilisearch</strong> serves from a prebuilt '
+                . 'index and needs a reindex before the hidden product is dropped '
+                . 'from search results.',
             ),
         ]);
         $actions->addField('action_redirect_cms', 'select', [
