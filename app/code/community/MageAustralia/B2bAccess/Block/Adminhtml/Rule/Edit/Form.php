@@ -51,14 +51,22 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
             'note' => $helper->__('Lower numbers are evaluated first.'),
         ]);
         $general->addField('enforcement', 'select', [
-            'name' => 'enforcement', 'label' => $helper->__('Enforcement'),
+            'name' => 'enforcement', 'label' => $helper->__('Applies at'),
             'values' => (new MageAustralia_B2bAccess_Model_System_Enforcement())->toOptionArray(),
-            'note' => $helper->__('Where the rule bites. Country rules usually want Checkout or Both.'),
+            'note' => $helper->__(
+                'Where the rule fires: on the storefront (catalog / PDP / search), '
+                . 'at checkout (add-to-cart guard), or both. Country-scoped rules '
+                . 'usually want Checkout or Both because a guest\'s country is only '
+                . 'known once they\'ve entered a shipping address.',
+            ),
         ]);
         $general->addField('message', 'textarea', [
-            'name' => 'message', 'label' => $helper->__('Message override'),
+            'name' => 'message', 'label' => $helper->__('Custom "gated" message'),
             'style' => 'height:3em',
-            'note' => $helper->__('Optional. Shown in place of a hidden price / on a blocked purchase. Falls back to the store default.'),
+            'note' => $helper->__(
+                'Optional. Overrides the store-wide hidden-price / blocked-purchase '
+                . 'message for products matched by this rule.',
+            ),
         ]);
 
         /* ---- Activation scope (all AND-ed; empty = any) ---- */
@@ -134,22 +142,57 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
             'required' => false,
         ])->setRule($rule)->setRenderer($treeRenderer);
 
-        /* ---- Actions ---- */
-        $actions = $form->addFieldset('actions', ['legend' => $helper->__('Actions')]);
-        $actions->addField('action_hide_listing', 'select', [
-            'name' => 'action_hide_listing', 'label' => $helper->__('Hide from listings and search'), 'values' => $yesno,
-            'note' => $helper->__('Requires a Meilisearch reindex to take effect in search.'),
+        /* ---- What happens when the rule matches ---- */
+        // Each row here is an independent switch, applied on top of the others.
+        // Merchants read "Hide" as one thing, so we prefix each toggle with the
+        // *scope* of what is hidden ("Product", "Price", "Purchase") to break
+        // that ambiguity: "Hide product from listings" is not the same as
+        // "Hide product price".
+        $actions = $form->addFieldset('actions', [
+            'legend' => $helper->__('When this rule matches, do the following'),
+            'comment' => $helper->__(
+                'Each toggle is independent - turn on the ones you want. The most '
+                . 'common combination is <strong>Hide price = Yes + Block purchase = Yes</strong> '
+                . '(price shows "Log in to see pricing"; add-to-cart is refused '
+                . 'server-side).',
+            ),
         ]);
         $actions->addField('action_hide_price', 'select', [
-            'name' => 'action_hide_price', 'label' => $helper->__('Hide price'), 'values' => $yesno,
+            'name' => 'action_hide_price',
+            'label' => $helper->__('Hide product price'),
+            'values' => $yesno,
+            'note' => $helper->__(
+                'The product is still browseable, but the price is replaced with the '
+                . 'store default "Log in to see pricing" message (or the override above).',
+            ),
         ]);
         $actions->addField('action_block_purchase', 'select', [
-            'name' => 'action_block_purchase', 'label' => $helper->__('Block purchase'), 'values' => $yesno,
+            'name' => 'action_block_purchase',
+            'label' => $helper->__('Block add-to-cart'),
+            'values' => $yesno,
+            'note' => $helper->__(
+                'Reject cart/checkout attempts server-side. Belt-and-braces on top of '
+                . '"Hide product price" - a crafted URL cannot add the product to a cart.',
+            ),
+        ]);
+        $actions->addField('action_hide_listing', 'select', [
+            'name' => 'action_hide_listing',
+            'label' => $helper->__('Remove product from catalog + search'),
+            'values' => $yesno,
+            'note' => $helper->__(
+                'Stronger than hiding the price: the product disappears entirely '
+                . 'from category listings, the search index and layered navigation. '
+                . 'Requires a Meilisearch reindex to take effect in search.',
+            ),
         ]);
         $actions->addField('action_redirect_cms', 'select', [
-            'name' => 'action_redirect_cms', 'label' => $helper->__('Redirect gated product page to'),
+            'name' => 'action_redirect_cms',
+            'label' => $helper->__('Redirect direct product URLs to'),
             'values' => $this->getCmsRedirectOptions(),
-            'note' => $helper->__('Optional. Where a direct hit on a hidden product page is sent.'),
+            'note' => $helper->__(
+                'Optional. Where to send a visitor who hits a hidden product\'s URL '
+                . 'directly (bookmark, deep link, ad landing page).',
+            ),
         ]);
 
         $form->setValues($this->getFormValues($rule));
