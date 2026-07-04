@@ -258,8 +258,22 @@ class MageAustralia_B2bAccess_Model_Observer
             return;
         }
 
-        $hidePrice = $helper->shouldHidePrice($product);
-        $blockPurchase = $helper->shouldBlockPurchase($product);
+        // In API-Platform requests the caller identity is resolved from the JWT,
+        // not the customer/session singleton, so the ProductProvider dispatches
+        // this event with an explicit `customer_group_id`. Use it directly if
+        // present; fall back to the session-based path only if a legacy caller
+        // is dispatching without the group id (older core, tests).
+        $callerGroupId = $observer->getEvent()->getData('customer_group_id');
+        if (is_int($callerGroupId) || (is_string($callerGroupId) && $callerGroupId !== '')) {
+            $gate = $helper->gate();
+            $storeId = (int) Mage::app()->getStore()->getId();
+            $groupId = (int) $callerGroupId;
+            $hidePrice = $gate->groupGateApplies($storeId, $groupId, 'hide_price');
+            $blockPurchase = $gate->groupGateApplies($storeId, $groupId, 'block_purchase');
+        } else {
+            $hidePrice = $helper->shouldHidePrice($product);
+            $blockPurchase = $helper->shouldBlockPurchase($product);
+        }
         // Login-wall applies site-wide, not per-product; expose it so a
         // headless storefront can decide whether to redirect off category/PDP
         // pages when a guest lands on them.
