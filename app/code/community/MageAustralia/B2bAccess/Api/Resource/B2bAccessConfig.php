@@ -67,9 +67,25 @@ class B2bAccessConfig
     #[ApiProperty(writable: false)]
     public ?string $loginMessage = null;
 
-    /** Message rendered in place of a hidden price. */
+    /** Guest-facing "hidden price" message. */
     #[ApiProperty(writable: false)]
     public ?string $hiddenPriceMessage = null;
+
+    /** Guest-facing "hidden price" CTA URL (login by default). */
+    #[ApiProperty(writable: false)]
+    public ?string $hiddenPriceCtaHref = null;
+
+    /** Message shown to a logged-in customer whose group still hits the gate. */
+    #[ApiProperty(writable: false)]
+    public ?string $hiddenPriceMessageForCustomer = null;
+
+    /** CTA label for the logged-in-customer variant (defaults to "Apply for a trade account"). */
+    #[ApiProperty(writable: false)]
+    public ?string $hiddenPriceCtaLabelForCustomer = null;
+
+    /** CTA URL for the logged-in-customer variant (defaults to /trade-application). */
+    #[ApiProperty(writable: false)]
+    public ?string $hiddenPriceCtaHrefForCustomer = null;
 
     /** Redirect target for guests hitting a gated page. Relative path. */
     #[ApiProperty(writable: false)]

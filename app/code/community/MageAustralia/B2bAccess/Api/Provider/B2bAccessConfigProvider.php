@@ -51,6 +51,10 @@ final class B2bAccessConfigProvider implements ProviderInterface
         $dto->blockPurchase = $helper->shouldBlockPurchase();
         $dto->loginMessage = $helper->getLoginMessage();
         $dto->hiddenPriceMessage = $helper->getPriceMessage();
+        $dto->hiddenPriceCtaHref = $helper->getPriceCtaHref();
+        $dto->hiddenPriceMessageForCustomer = $helper->getPriceMessageForCustomer();
+        $dto->hiddenPriceCtaLabelForCustomer = $helper->getPriceCtaLabelForCustomer();
+        $dto->hiddenPriceCtaHrefForCustomer = $helper->getPriceCtaHrefForCustomer();
         $dto->loginRedirectUrl = $helper->getLoginRedirectUrl();
 
         return $dto;

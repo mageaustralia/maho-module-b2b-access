@@ -97,13 +97,45 @@
                             <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
                         </hide_listing>
                         <message translate="label comment">
-                            <label>Hidden-price message</label>
-                            <comment>Shown in place of the price (e.g. "Log in to see pricing").</comment>
+                            <label>Hidden-price message (guest)</label>
+                            <comment><![CDATA[Shown in place of the price to <strong>guests</strong> (not logged in). e.g. "Log in to see pricing".]]></comment>
                             <frontend_type>text</frontend_type>
                             <sort_order>20</sort_order>
                             <depends><hide>1</hide></depends>
                             <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
                         </message>
+                        <cta_href translate="label comment">
+                            <label>Guest link target</label>
+                            <comment>URL the guest "hidden price" link opens. Defaults to /login on the storefront.</comment>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>21</sort_order>
+                            <depends><hide>1</hide></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </cta_href>
+                        <message_customer translate="label comment">
+                            <label>Hidden-price message (logged-in customer)</label>
+                            <comment><![CDATA[Shown to <strong>logged-in customers</strong> whose group still hits the gate (retail customer viewing wholesale-only pricing, say). e.g. "Trade customer pricing".]]></comment>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>22</sort_order>
+                            <depends><hide>1</hide></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </message_customer>
+                        <cta_label_customer translate="label comment">
+                            <label>Logged-in link label</label>
+                            <comment>Button/link text shown to logged-in customers. Defaults to "Apply for a trade account".</comment>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>23</sort_order>
+                            <depends><hide>1</hide></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </cta_label_customer>
+                        <cta_href_customer translate="label comment">
+                            <label>Logged-in link target</label>
+                            <comment>URL the "Apply for a trade account" link opens. Defaults to /trade-application on the storefront.</comment>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>24</sort_order>
+                            <depends><hide>1</hide></depends>
+                            <show_in_default>1</show_in_default><show_in_website>1</show_in_website><show_in_store>1</show_in_store>
+                        </cta_href_customer>
                         <block_purchase translate="label comment">
                             <label>Block purchasing too</label>
                             <comment>Reject add-to-cart server-side for gated products (recommended; hiding the price alone is bypassable).</comment>

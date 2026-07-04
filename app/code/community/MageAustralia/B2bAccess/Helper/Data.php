@@ -34,8 +34,20 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
     public const XML_LOGIN_MESSAGE   = 'b2baccess/login/message';
     public const XML_HIDE_PRICE      = 'b2baccess/price/hide';
     public const XML_HIDE_LISTING    = 'b2baccess/price/hide_listing';
-    public const XML_PRICE_MESSAGE   = 'b2baccess/price/message';
+    public const XML_PRICE_MESSAGE          = 'b2baccess/price/message';
+    public const XML_PRICE_CTA_HREF         = 'b2baccess/price/cta_href';
+    public const XML_PRICE_MESSAGE_CUSTOMER = 'b2baccess/price/message_customer';
+    public const XML_PRICE_CTA_LABEL_CUSTOMER = 'b2baccess/price/cta_label_customer';
+    public const XML_PRICE_CTA_HREF_CUSTOMER  = 'b2baccess/price/cta_href_customer';
     public const XML_BLOCK_PURCHASE  = 'b2baccess/price/block_purchase';
+
+    // Sensible defaults so a merchant who just enables the module gets a
+    // working two-state gate without touching the six new config fields.
+    public const DEFAULT_PRICE_MESSAGE            = 'Log in to see pricing.';
+    public const DEFAULT_PRICE_CTA_HREF           = '/login';
+    public const DEFAULT_PRICE_MESSAGE_CUSTOMER   = 'Trade customer pricing.';
+    public const DEFAULT_PRICE_CTA_LABEL_CUSTOMER = 'Apply for a trade account';
+    public const DEFAULT_PRICE_CTA_HREF_CUSTOMER  = '/trade-application';
     public const XML_BY_CUSTOMER     = 'b2baccess/matrix/by_customer';
     public const XML_CUSTOMER_GROUPS = 'b2baccess/matrix/customer_groups';
     public const XML_BY_CATEGORY     = 'b2baccess/matrix/by_category';
@@ -223,7 +235,45 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
                 }
             }
         }
-        return trim((string) Mage::getStoreConfig(self::XML_PRICE_MESSAGE));
+        $msg = trim((string) Mage::getStoreConfig(self::XML_PRICE_MESSAGE));
+        return $msg !== '' ? $msg : self::DEFAULT_PRICE_MESSAGE;
+    }
+
+    /**
+     * CTA URL for guests when the price is hidden. Configurable per-store so
+     * merchants with a bespoke login route can point at it.
+     */
+    public function getPriceCtaHref(): string
+    {
+        $url = trim((string) Mage::getStoreConfig(self::XML_PRICE_CTA_HREF));
+        return $url !== '' ? $url : self::DEFAULT_PRICE_CTA_HREF;
+    }
+
+    /**
+     * Message shown in place of the price to a LOGGED-IN customer whose group
+     * still hits the gate (retail-group customer looking at wholesale-only
+     * pricing). Distinct from getPriceMessage() so the CTA can point at the
+     * trade-application flow rather than /login (which is a dead-end when the
+     * customer is already logged in).
+     */
+    public function getPriceMessageForCustomer(): string
+    {
+        $msg = trim((string) Mage::getStoreConfig(self::XML_PRICE_MESSAGE_CUSTOMER));
+        return $msg !== '' ? $msg : self::DEFAULT_PRICE_MESSAGE_CUSTOMER;
+    }
+
+    /** CTA label for logged-in customers ("Apply for a trade account"). */
+    public function getPriceCtaLabelForCustomer(): string
+    {
+        $lbl = trim((string) Mage::getStoreConfig(self::XML_PRICE_CTA_LABEL_CUSTOMER));
+        return $lbl !== '' ? $lbl : self::DEFAULT_PRICE_CTA_LABEL_CUSTOMER;
+    }
+
+    /** CTA URL for logged-in customers (trade-application form on the storefront). */
+    public function getPriceCtaHrefForCustomer(): string
+    {
+        $url = trim((string) Mage::getStoreConfig(self::XML_PRICE_CTA_HREF_CUSTOMER));
+        return $url !== '' ? $url : self::DEFAULT_PRICE_CTA_HREF_CUSTOMER;
     }
 
     /* ---------------- checkout guard ---------------- */
