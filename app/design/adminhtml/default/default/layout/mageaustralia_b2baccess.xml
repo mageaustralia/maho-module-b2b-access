@@ -25,8 +25,23 @@
     </adminhtml_b2baccess_rule_grid>
 
     <!-- Rule edit form. The container auto-creates its
-         b2baccess/adminhtml_rule_edit_form child (mode = edit). -->
+         b2baccess/adminhtml_rule_edit_form child (mode = edit).
+         The two <head> actions match Catalog Rule's promo.xml:
+           - setCanLoadRulesJs flips a flag Mage_Adminhtml_Block_Page_Head
+             checks to bundle the rules JS (which defines VarienRulesForm,
+             the client-side tree widget my form's Conditions renderer
+             needs to render the Add/Remove condition buttons).
+           - maho-tree.js is the accompanying tree renderer JS.
+         Without these the tree renders in the DOM but the browser throws
+         "VarienRulesForm is not defined" at page-init time. -->
+    <adminhtml_b2baccess_rule_new>
+        <update handle="adminhtml_b2baccess_rule_edit"/>
+    </adminhtml_b2baccess_rule_new>
     <adminhtml_b2baccess_rule_edit>
+        <reference name="head">
+            <action method="setCanLoadRulesJs"><flag>1</flag></action>
+            <action method="addJs"><name>maho-tree.js</name></action>
+        </reference>
         <reference name="content">
             <block type="b2baccess/adminhtml_rule_edit" name="b2baccess.rule.edit"/>
         </reference>
