@@ -42,7 +42,13 @@ class MageAustralia_B2bAccess_Model_Resource_Rule_Collection extends Mage_Core_M
     {
         parent::_afterLoad();
 
-        $ruleIds = array_map('intval', $this->getLoadedIds());
+        // Iterate the loaded items to collect IDs. Varien had a getLoadedIds()
+        // helper that Maho dropped; iterating $this is the drop-in replacement
+        // (items are already in memory at _afterLoad time, so no extra query).
+        $ruleIds = [];
+        foreach ($this as $rule) {
+            $ruleIds[] = (int) $rule->getId();
+        }
         if ($ruleIds === []) {
             return $this;
         }
