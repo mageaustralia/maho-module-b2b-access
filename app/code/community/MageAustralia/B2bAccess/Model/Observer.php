@@ -285,12 +285,39 @@ class MageAustralia_B2bAccess_Model_Observer
             'canCheckout'   => !$blockPurchase,
         ];
 
+        // Guest vs logged-in-but-not-eligible: same gate (hidePrice=true) but
+        // different UX. Guest gets "Log in to see pricing" → /login. Logged-in
+        // customer gets "Trade customer pricing" → /trade-application. The
+        // observer picks the right message + CTA per caller so the storefront
+        // doesn't have to duplicate the "am I signed in" check at render time.
+        $callerIsGuest = ($callerGroupId === null) || (int) $callerGroupId === Mage_Customer_Model_Group::NOT_LOGGED_IN_ID;
+        if ($hidePrice) {
+            if ($callerIsGuest) {
+                $hiddenPriceMessage = $helper->getPriceMessage($product);
+                $hiddenPriceCta = [
+                    'label' => 'Log in',
+                    'href'  => $helper->getPriceCtaHref(),
+                ];
+            } else {
+                $hiddenPriceMessage = $helper->getPriceMessageForCustomer();
+                $hiddenPriceCta = [
+                    'label' => $helper->getPriceCtaLabelForCustomer(),
+                    'href'  => $helper->getPriceCtaHrefForCustomer(),
+                ];
+            }
+        } else {
+            $hiddenPriceMessage = null;
+            $hiddenPriceCta = null;
+        }
+
         // Namespace under the module code so future B2B modules can add their
         // own extension blocks under their own keys (myPrice, orderApproval, ...).
         $existing = (array) ($dto->extensions ?? []);
         $existing['b2bAccess'] = [
             'gateFlags'          => $flags,
-            'hiddenPriceMessage' => $hidePrice ? $helper->getPriceMessage($product) : null,
+            'callerIsGuest'      => $callerIsGuest,
+            'hiddenPriceMessage' => $hiddenPriceMessage,
+            'hiddenPriceCta'     => $hiddenPriceCta,
         ];
         $dto->extensions = $existing;
 
