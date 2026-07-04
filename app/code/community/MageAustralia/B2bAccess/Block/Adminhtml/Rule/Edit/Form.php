@@ -61,10 +61,15 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
             'note' => $helper->__('Optional. Shown in place of a hidden price / on a blocked purchase. Falls back to the store default.'),
         ]);
 
-        /* ---- Scope (all AND-ed; empty = any) ---- */
+        /* ---- Activation scope (all AND-ed; empty = any) ---- */
         $scope = $form->addFieldset('scope', [
-            'legend' => $helper->__('Scope'),
-            'comment' => $helper->__('All dimensions are combined with AND. Leave a list empty to match any value for that dimension.'),
+            'legend' => $helper->__('Activation scope'),
+            'comment' => $helper->__(
+                'Where the rule fires. Customer groups, stores and destination '
+                . 'countries are combined with AND - leave a list empty to match any '
+                . 'value for that dimension. Which PRODUCTS the rule fires on is set '
+                . 'in the "Product matching" section below.',
+            ),
         ]);
         $scope->addField('scope_group_ids', 'multiselect', [
             'name' => 'scope_group_ids[]', 'label' => $helper->__('Customer groups'),
