@@ -89,12 +89,15 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
         // for backwards-compat with pre-v1.2 rules (see the Gate fallback path).
 
         /* ---- Product matching (Catalog-Rule-style condition tree) ---- */
-        // Same pattern as Mage_Adminhtml_Block_Promo_Catalog_Edit_Tab_Conditions
-        // - Mage::getBlockSingleton() returns the layout singleton the fieldset
-        // renderer + rule/conditions widget need. Returns false only in the
-        // absence of a dispatched front controller action (CLI); safe here
-        // because this block only ever renders inside the admin request.
-        $conditionsRenderer = Mage::getBlockSingleton('adminhtml/widget_form_renderer_fieldset')
+        // Same pattern as Mage_Adminhtml_Block_Promo_Catalog_Edit_Tab_Conditions.
+        // Mage::getBlockSingleton() returns the layout singleton the fieldset
+        // renderer needs, but returns false when there's no dispatched front
+        // controller action (CLI). Fall back to direct instantiation for tests
+        // and any oddball non-dispatched render path.
+        $fieldsetRendererName = 'adminhtml/widget_form_renderer_fieldset';
+        $fieldsetRenderer = Mage::getBlockSingleton($fieldsetRendererName)
+            ?: $this->getLayout()->createBlock($fieldsetRendererName);
+        $conditionsRenderer = $fieldsetRenderer
             ->setTemplate('promo/fieldset.phtml')
             ->setNewChildUrl(
                 $this->getUrl('*/*/newConditionHtml/form/conditions_fieldset'),
@@ -110,12 +113,21 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
             ),
         ])->setRenderer($conditionsRenderer);
 
+        // Mage_Rule_Block_Conditions is a Renderer, not a Block - it implements
+        // RendererInterface directly. Layout::createBlock() rejects it as
+        // "Invalid block type" because it doesn't extend Mage_Core_Block_Abstract.
+        // Mage::getBlockSingleton() sidesteps that check with `new $className()`,
+        // which works. If getBlockSingleton returns false (no FC action), fall
+        // through to the same "new" call.
+        $treeRenderer = Mage::getBlockSingleton('rule/conditions')
+            ?: new Mage_Rule_Block_Conditions();
+
         $conditions->addField('conditions', 'text', [
             'name' => 'conditions',
             'label' => $helper->__('Product conditions'),
             'title' => $helper->__('Product conditions'),
             'required' => false,
-        ])->setRule($rule)->setRenderer(Mage::getBlockSingleton('rule/conditions'));
+        ])->setRule($rule)->setRenderer($treeRenderer);
 
         /* ---- Actions ---- */
         $actions = $form->addFieldset('actions', ['legend' => $helper->__('Actions')]);
