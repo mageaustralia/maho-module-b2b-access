@@ -32,6 +32,7 @@ final class B2bAccessConfigProvider implements ProviderInterface
      * @param array<string, mixed> $uriVariables
      * @param array<string, mixed> $context
      */
+    #[\Override]
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): B2bAccessConfig
     {
         /** @var \MageAustralia_B2bAccess_Helper_Data $helper */

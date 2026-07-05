@@ -288,7 +288,8 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
         $address = $quote->isVirtual() ? $quote->getBillingAddress() : $quote->getShippingAddress();
         $country = $address ? (string) $address->getCountryId() : '';
         if ($country === '') {
-            $country = (string) $quote->getBillingAddress()?->getCountryId();
+            // getBillingAddress() is typed non-nullable so nullsafe is redundant.
+            $country = (string) $quote->getBillingAddress()->getCountryId();
         }
         return $country !== '' ? strtoupper($country) : null;
     }
@@ -379,7 +380,7 @@ class MageAustralia_B2bAccess_Helper_Data extends Mage_Core_Helper_Abstract
     {
         return array_values(array_unique(array_map(
             'intval',
-            array_filter(array_map('trim', explode(',', $csv)), 'strlen'),
+            array_filter(array_map('trim', explode(',', $csv)), static fn(string $s): bool => $s !== ''),
         )));
     }
 }
