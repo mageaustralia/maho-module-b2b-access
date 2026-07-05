@@ -80,6 +80,23 @@ class MageAustralia_B2bAccess_Model_Rule extends Mage_Rule_Model_Abstract
         return Mage::getModel('rule/condition_combine');
     }
 
+    /**
+     * Explicit updated_at stamp: the install script uses TIMESTAMP_INIT_UPDATE
+     * for MySQL parity, but PgSQL and SQLite downgrade that to plain
+     * CURRENT_TIMESTAMP with no on-update semantics. Stamping here keeps the
+     * behaviour engine-agnostic without touching the shipped install script.
+     */
+    #[\Override]
+    protected function _beforeSave()
+    {
+        $now = Mage_Core_Model_Locale::nowUtc();
+        if (!$this->getId()) {
+            $this->setCreatedAt($now);
+        }
+        $this->setUpdatedAt($now);
+        return parent::_beforeSave();
+    }
+
     public function getRuleId(): ?int
     {
         $id = $this->getData('rule_id');
@@ -239,6 +256,7 @@ class MageAustralia_B2bAccess_Model_Rule extends Mage_Rule_Model_Abstract
     }
 
     /** @return MageAustralia_B2bAccess_Model_Resource_Rule */
+    #[\Override]
     protected function _getResource()
     {
         /** @var MageAustralia_B2bAccess_Model_Resource_Rule $resource */
