@@ -24,7 +24,7 @@ class MageAustralia_B2bAccess_Block_Adminhtml_Rule_Edit_Form extends Mage_Adminh
         $rule = Mage::registry('b2baccess_rule');
         $helper = Mage::helper('b2baccess');
 
-        $form = new Varien_Data_Form([
+        $form = new Maho\Data\Form([
             'id' => 'edit_form',
             'action' => $this->getUrl('*/*/save'),
             'method' => 'post',

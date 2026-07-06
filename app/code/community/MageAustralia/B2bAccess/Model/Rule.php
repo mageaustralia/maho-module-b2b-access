@@ -118,7 +118,11 @@ class MageAustralia_B2bAccess_Model_Rule extends Mage_Rule_Model_Abstract
     /** @return list<string> */
     public function getCountryCodesArray(): array
     {
-        $decoded = json_decode((string) ($this->getScopeCountryCodes() ?? '[]'), true);
+        try {
+            $decoded = Mage::helper('core')->jsonDecode((string) ($this->getScopeCountryCodes() ?? '[]'));
+        } catch (\JsonException | Mage_Core_Exception) {
+            $decoded = null;
+        }
         if (!is_array($decoded)) {
             return [];
         }
@@ -243,7 +247,11 @@ class MageAustralia_B2bAccess_Model_Rule extends Mage_Rule_Model_Abstract
      */
     private function jsonInts(?string $json): array
     {
-        $decoded = json_decode((string) ($json ?? '[]'), true);
+        try {
+            $decoded = Mage::helper('core')->jsonDecode((string) ($json ?? '[]'));
+        } catch (\JsonException | Mage_Core_Exception) {
+            $decoded = null;
+        }
         if (!is_array($decoded)) {
             return [];
         }
