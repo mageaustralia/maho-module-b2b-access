@@ -15,6 +15,18 @@ rewrites.
 
 ---
 
+## Screenshots
+
+**Guest sees the gate; approved wholesale customers see prices:**
+
+| Guest | Wholesale customer |
+|---|---|
+| ![Guest - price hidden](screenshots/guest-hidden-price.png) | ![Wholesale - price visible](screenshots/wholesale-sees-price.png) |
+
+**Rules are Catalog-Rule-style condition trees with activation scope and independent action toggles:**
+
+![Admin rule edit](screenshots/admin-rule-edit.png)
+
 ## Feature scope at a glance
 
 | Capability | What it does | Scope options | Server-enforced |
