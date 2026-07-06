@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Maho\Config\Route;
+
 /**
  * Maho
  *
@@ -44,12 +46,15 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
 
     #[Maho\Config\Route('/admin/b2baccess_rule')]
     #[Maho\Config\Route('/admin/b2baccess_rule/index')]
+    #[Route('/admin/b2baccess_rule', methods: ['GET'])]
+    #[Route('/admin/b2baccess_rule/index', methods: ['GET'])]
     public function indexAction(): void
     {
         $this->_initAction()->renderLayout();
     }
 
     #[Maho\Config\Route('/admin/b2baccess_rule/grid')]
+    #[Route('/admin/b2baccess_rule/grid', methods: ['GET', 'POST'])]
     public function gridAction(): void
     {
         $this->loadLayout(false);
@@ -57,12 +62,14 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
     }
 
     #[Maho\Config\Route('/admin/b2baccess_rule/new')]
+    #[Route('/admin/b2baccess_rule/new', methods: ['GET'])]
     public function newAction(): void
     {
         $this->_forward('edit');
     }
 
     #[Maho\Config\Route('/admin/b2baccess_rule/edit')]
+    #[Route('/admin/b2baccess_rule/edit', methods: ['GET'])]
     public function editAction(): void
     {
         $id = (int) $this->getRequest()->getParam('id');
@@ -92,6 +99,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
     }
 
     #[Maho\Config\Route('/admin/b2baccess_rule/save')]
+    #[Route('/admin/b2baccess_rule/save', methods: ['POST'])]
     public function saveAction(): void
     {
         $data = $this->getRequest()->getPost();
@@ -169,6 +177,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
     }
 
     #[Maho\Config\Route('/admin/b2baccess_rule/delete')]
+    #[Route('/admin/b2baccess_rule/delete', methods: ['POST'])]
     public function deleteAction(): void
     {
         $id = (int) $this->getRequest()->getParam('id');
@@ -184,6 +193,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
     }
 
     #[Maho\Config\Route('/admin/b2baccess_rule/massStatus')]
+    #[Route('/admin/b2baccess_rule/massStatus', methods: ['POST'])]
     public function massStatusAction(): void
     {
         $ids = (array) $this->getRequest()->getParam('rule');
@@ -208,6 +218,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
      * be a B2bAccess rule so the combinator picks up the right child options.
      */
     #[Maho\Config\Route('/admin/b2baccess_rule/newConditionHtml')]
+    #[Route('/admin/b2baccess_rule/newConditionHtml', methods: ['GET', 'POST'])]
     public function newConditionHtmlAction(): void
     {
         $id = (string) $this->getRequest()->getParam('id');
@@ -234,6 +245,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
     }
 
     #[Maho\Config\Route('/admin/b2baccess_rule/massDelete')]
+    #[Route('/admin/b2baccess_rule/massDelete', methods: ['POST'])]
     public function massDeleteAction(): void
     {
         $ids = (array) $this->getRequest()->getParam('rule');
