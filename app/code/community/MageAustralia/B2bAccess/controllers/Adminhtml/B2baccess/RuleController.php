@@ -274,7 +274,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
             $v = (int) $v;
             $ids[$v] = $v;
         }
-        return json_encode(array_values($ids)) ?: '[]';
+        return Mage::helper('core')->jsonEncode(array_values($ids));
     }
 
     /**
@@ -289,7 +289,7 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
                 $codes[$c] = $c;
             }
         }
-        return json_encode(array_values($codes)) ?: '[]';
+        return Mage::helper('core')->jsonEncode(array_values($codes));
     }
 
 }
