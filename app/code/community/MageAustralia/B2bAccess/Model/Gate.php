@@ -102,9 +102,41 @@ class MageAustralia_B2bAccess_Model_Gate
     }
 
     /**
+     * Per-product gate for a caller whose identity is passed in explicitly.
+     *
+     * The session-based helpers cannot be used from API Platform: the caller is
+     * resolved from a JWT, not the customer session, so Mage's customer
+     * singleton is empty and every request would look like a guest. Callers that
+     * know the group (the API DTO builders) hand it to us instead.
+     *
+     * Use this - not groupGateApplies() - whenever a product is in hand.
+     * groupGateApplies() only considers *catalog-wide* rules, so evaluating a
+     * product through it silently ignores every category-scoped, product-scoped
+     * and condition-based rule.
+     */
+    public function actionApplies(
+        Mage_Catalog_Model_Product $product,
+        int $storeId,
+        int $groupId,
+        string $action,
+        ?string $countryCode = null,
+    ): bool {
+        foreach ($this->matchingRules($product, $storeId, $groupId, $countryCode) as $rule) {
+            if ($this->ruleHasAction($rule, $action)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Group-only gate for surfaces with no product context (e.g. the listing
      * toolbar). True when any catalog-wide rule with the given action matches
      * the current group.
+     *
+     * Only catalog-wide rules are considered, because without a product there is
+     * nothing to evaluate a category/condition scope against. If you have a
+     * product, call actionApplies() instead.
      */
     public function groupGateApplies(int $storeId, int $groupId, string $action): bool
     {
