@@ -268,8 +268,13 @@ class MageAustralia_B2bAccess_Model_Observer
             $gate = $helper->gate();
             $storeId = (int) Mage::app()->getStore()->getId();
             $groupId = (int) $callerGroupId;
-            $hidePrice = $gate->groupGateApplies($storeId, $groupId, 'hide_price');
-            $blockPurchase = $gate->groupGateApplies($storeId, $groupId, 'block_purchase');
+            // Evaluate against THIS product. groupGateApplies() only looks at
+            // catalog-wide rules, so using it here silently ignored every
+            // category-scoped, product-scoped and condition-based rule: on a
+            // headless store the entire rules engine did nothing, and only a
+            // catalog-wide gate had any effect.
+            $hidePrice = $gate->actionApplies($product, $storeId, $groupId, 'hide_price');
+            $blockPurchase = $gate->actionApplies($product, $storeId, $groupId, 'block_purchase');
         } else {
             $hidePrice = $helper->shouldHidePrice($product);
             $blockPurchase = $helper->shouldBlockPurchase($product);
@@ -329,6 +334,160 @@ class MageAustralia_B2bAccess_Model_Observer
                 if (property_exists($dto, $field)) {
                     $dto->{$field} = null;
                 }
+            }
+        }
+    }
+
+    /**
+     * Block purchase on ANY add-to-cart, headless included.
+     *
+     * blockPurchase() above only fires on the legacy frontend controllers
+     * (controller_action_predispatch_checkout_cart_add, area: frontend). The
+     * API Platform cart is a Symfony route and never dispatches those, so
+     * `POST /api/rest/v2/guest-carts/{id}/items` walked straight past the gate:
+     * a blocked product could be added, and the cart DTO then handed back the
+     * very price the catalog API had just withheld.
+     *
+     * sales_quote_product_add_after lives in Mage_Sales_Model_Quote, so it fires
+     * for the frontend, the API and the admin alike. Throwing here aborts the
+     * add on every surface.
+     *
+     * The group comes from the quote, not the session: under a JWT the customer
+     * session is empty, so a session lookup would read every API caller as a
+     * guest and over-block logged-in trade customers.
+     */
+    #[MahoObserver('sales_quote_product_add_after', type: 'singleton')]
+    public function blockGatedQuoteAdd(Observer $observer): void
+    {
+        $helper = $this->helper();
+        if (!$helper->isEnabled()) {
+            return;
+        }
+
+        $items = $observer->getEvent()->getData('items');
+        if (!is_array($items)) {
+            return;
+        }
+
+        foreach ($items as $item) {
+            if (!$item instanceof Mage_Sales_Model_Quote_Item) {
+                continue;
+            }
+            $quote = $item->getQuote();
+            $product = $item->getProduct();
+            if (!$quote instanceof Mage_Sales_Model_Quote || !$product instanceof Mage_Catalog_Model_Product) {
+                continue;
+            }
+
+            if ($helper->gate()->actionApplies(
+                $product,
+                (int) $quote->getStoreId(),
+                (int) $quote->getCustomerGroupId(),
+                'block_purchase',
+            )) {
+                Mage::throwException(
+                    (string) $helper->__('This product is not available for purchase.'),
+                );
+            }
+        }
+    }
+
+    /**
+     * Withhold prices on cart items the caller isn't allowed to see.
+     *
+     * Defence in depth behind blockGatedQuoteAdd(): a gated product should never
+     * reach a cart in the first place, but one can already be sitting there --
+     * added while the customer was in an eligible group, then left behind when
+     * they logged out and the quote fell back to NOT_LOGGED_IN.
+     *
+     * The DTO's money fields are non-nullable floats, so they are zeroed rather
+     * than nulled. Checkout is blocked for such a cart anyway (guardCheckout),
+     * so a zeroed total is never charged.
+     */
+    #[MahoObserver('api_cart_item_dto_build', type: 'singleton')]
+    public function gateApiCartItemDto(Observer $observer): void
+    {
+        $helper = $this->helper();
+        if (!$helper->isEnabled()) {
+            return;
+        }
+
+        $item = $observer->getEvent()->getData('item');
+        $dto = $observer->getEvent()->getData('dto');
+        if (!$item instanceof Mage_Sales_Model_Quote_Item || !is_object($dto)) {
+            return;
+        }
+
+        $quote = $item->getQuote();
+        $product = $item->getProduct();
+        if (!$quote instanceof Mage_Sales_Model_Quote || !$product instanceof Mage_Catalog_Model_Product) {
+            return;
+        }
+
+        if (!$helper->gate()->actionApplies(
+            $product,
+            (int) $quote->getStoreId(),
+            (int) $quote->getCustomerGroupId(),
+            'hide_price',
+        )) {
+            return;
+        }
+
+        foreach (['price', 'priceInclTax', 'rowTotal', 'rowTotalInclTax', 'rowTotalWithDiscount'] as $field) {
+            if (property_exists($dto, $field)) {
+                $dto->{$field} = 0.0;
+            }
+        }
+        foreach (['discountAmount', 'discountPercent', 'taxAmount', 'taxPercent'] as $field) {
+            if (property_exists($dto, $field)) {
+                $dto->{$field} = null;
+            }
+        }
+    }
+
+    /**
+     * Withhold the cart totals when the cart holds any price-gated item.
+     *
+     * Zeroing the line items alone still leaks: a single-item cart's grandTotal
+     * is the price. Same reasoning as gateApiCartItemDto() -- such a cart cannot
+     * be checked out, so the zeroed totals are never charged.
+     */
+    #[MahoObserver('api_cart_dto_build', type: 'singleton')]
+    public function gateApiCartDto(Observer $observer): void
+    {
+        $helper = $this->helper();
+        if (!$helper->isEnabled()) {
+            return;
+        }
+
+        $quote = $observer->getEvent()->getData('quote');
+        $dto = $observer->getEvent()->getData('dto');
+        if (!$quote instanceof Mage_Sales_Model_Quote || !is_object($dto)) {
+            return;
+        }
+
+        $gate = $helper->gate();
+        $storeId = (int) $quote->getStoreId();
+        $groupId = (int) $quote->getCustomerGroupId();
+
+        $gated = false;
+        foreach ($quote->getAllVisibleItems() as $item) {
+            $product = $item->getProduct();
+            if ($product instanceof Mage_Catalog_Model_Product
+                && $gate->actionApplies($product, $storeId, $groupId, 'hide_price')
+            ) {
+                $gated = true;
+                break;
+            }
+        }
+
+        if (!$gated || !property_exists($dto, 'prices') || !is_array($dto->prices)) {
+            return;
+        }
+
+        foreach (array_keys($dto->prices) as $key) {
+            if (is_numeric($dto->prices[$key])) {
+                $dto->prices[$key] = 0;
             }
         }
     }
