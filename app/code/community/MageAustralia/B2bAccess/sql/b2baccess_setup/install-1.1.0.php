@@ -39,13 +39,13 @@ if (!$conn->isTableExists($rule)) {
         ->addColumn('action_redirect_cms', Varien_Db_Ddl_Table::TYPE_TEXT, 255, ['nullable' => true], 'CMS page identifier to redirect gated PDP hits to')
         ->addColumn('enforcement', Varien_Db_Ddl_Table::TYPE_TEXT, 16, ['nullable' => false, 'default' => 'both'], 'visibility|checkout|both')
         ->addColumn('message', Varien_Db_Ddl_Table::TYPE_TEXT, '16k', ['nullable' => true], 'Per-rule hidden-price / blocked message override')
-        ->addColumn('created_at', Varien_Db_Ddl_Table::TYPE_TIMESTAMP, null, ['nullable' => false, 'default' => Varien_Db_Ddl_Table::TIMESTAMP_INIT])
+        ->addColumn('created_at', Varien_Db_Ddl_Table::TYPE_DATETIME, null, ['nullable' => false, 'default' => Varien_Db_Ddl_Table::TIMESTAMP_INIT])
         // MySQL fires ON UPDATE on this column automatically; the Rule model's
         // _beforeSave() also stamps it explicitly so PgSQL and SQLite (which
         // downgrade TIMESTAMP_INIT_UPDATE to plain CURRENT_TIMESTAMP with no
         // on-update semantics) stay in sync with the MySQL behaviour.
         // @phpstan-ignore classConstant.deprecated
-        ->addColumn('updated_at', Varien_Db_Ddl_Table::TYPE_TIMESTAMP, null, ['nullable' => false, 'default' => Varien_Db_Ddl_Table::TIMESTAMP_INIT_UPDATE])
+        ->addColumn('updated_at', Varien_Db_Ddl_Table::TYPE_DATETIME, null, ['nullable' => false, 'default' => Varien_Db_Ddl_Table::TIMESTAMP_INIT_UPDATE])
         ->addIndex($installer->getIdxName($rule, ['is_active', 'priority']), ['is_active', 'priority'])
         ->setComment('B2B access rules');
     $conn->createTable($t);
