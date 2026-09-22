@@ -23,7 +23,10 @@ class MageAustralia_B2bAccess_Adminhtml_B2baccess_RuleController extends Mage_Ad
     #[\Override]
     public function preDispatch()
     {
-        $this->_setForcedFormKeyActions(['save', 'delete', 'massStatus', 'massDelete']);
+        // Removed in Maho 26.9, where core key-checks every admin request itself
+        if (method_exists($this, '_setForcedFormKeyActions')) {
+            $this->_setForcedFormKeyActions(['save', 'delete', 'massStatus', 'massDelete']);
+        }
         return parent::preDispatch();
     }
 
